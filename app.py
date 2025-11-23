@@ -67,7 +67,6 @@ def load_and_preprocess_static_data():
 
 def initialize_user_data():
     """Khởi tạo hoặc tải dữ liệu người dùng vào Session State."""
-    # CHỈ CHẠY 1 LẦN KHI APP KHỞI ĐỘNG
     if 'df_users' not in st.session_state:
         try:
             df_users = load_data(USER_DATA_FILE)
@@ -406,4 +405,3 @@ if __name__ == '__main__':
         main_page(df_movies, cosine_sim)
     else:
         authentication_page(df_movies)
-
