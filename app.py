@@ -474,7 +474,7 @@ def get_vibrant_colors(n):
 def plot_recommendation_comparison(df_results, recommendation_type, movie_name=None):
     """
     Vẽ biểu đồ so sánh điểm số đề xuất (hoặc độ phổ biến) của các phim.
-    Mỗi phim một màu riêng biệt.
+    Mỗi phim một màu riêng biệt. (Đã chuyển sang cột dọc)
     """
     if df_results.empty:
         st.warning("Không có dữ liệu để vẽ biểu đồ.")
@@ -508,25 +508,28 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
     num_movies = len(df_plot)
     colors = get_vibrant_colors(num_movies)
 
-    # 3. Vẽ biểu đồ
-    fig, ax = plt.subplots(figsize=(10, num_movies * 0.6)) # Chiều cao linh hoạt
+    # 3. Vẽ biểu đồ CỘT DỌC
+    fig, ax = plt.subplots(figsize=(10, 6)) 
     
-    # Dùng biểu đồ cột ngang để tên phim dễ đọc hơn
-    bars = ax.barh(df_plot['Tên phim'], df_plot[score_col], 
+    # Dùng biểu đồ cột dọc
+    bars = ax.bar(df_plot['Tên phim'], df_plot[score_col], 
                    color=colors, edgecolor='black', alpha=0.8)
 
     # 4. Thêm nhãn giá trị lên thanh
     for bar in bars:
-        width = bar.get_width()
-        ax.text(width + ax.get_xlim()[1]*0.01, bar.get_y() + bar.get_height()/2, 
-                f'{width:.2f}', ha='left', va='center', fontsize=10, weight='bold')
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2, height + ax.get_ylim()[1]*0.01, 
+                f'{height:.2f}', ha='center', va='bottom', fontsize=10, weight='bold', rotation=45)
 
     ax.set_title(title, fontsize=14)
-    ax.set_xlabel(y_label)
-    ax.set_ylabel("Tên Phim")
+    ax.set_xlabel("Tên Phim") # Trục X là Tên Phim
+    ax.set_ylabel(y_label) # Trục Y là Điểm
     
-    # Điều chỉnh giới hạn trục x để nhãn không bị cắt
-    ax.set_xlim(0, ax.get_xlim()[1] * 1.1)
+    # Xoay nhãn trục X để tránh chồng chéo
+    plt.xticks(rotation=45, ha='right', fontsize=10)
+    
+    # Điều chỉnh giới hạn trục Y
+    ax.set_ylim(0, ax.get_ylim()[1] * 1.2)
     
     plt.tight_layout()
     st.pyplot(fig)
