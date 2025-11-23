@@ -18,20 +18,20 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 GUEST_USER = "Guest_ZeroClick" 
 
 # --- CẤU HÌNH DANH SÁCH THỂ LOẠI (TOPICS) THEO YÊU CẦU ---
-# Danh sách màu sắc cho Dark Theme
+# Danh sách màu sắc Pastel (Pastel Dream Palette) cho các thẻ
 COLOR_PALETTE = [
-    ("#FF4500", "#FF6347", "#CC3700"), # OrangeRed (Action)
-    ("#1E90FF", "#4169E1", "#1773CC"), # DodgerBlue (Sci-Fi)
-    ("#3CB371", "#66CDAA", "#309C60"), # MediumSeaGreen (Comedy)
-    ("#800080", "#BA55D3", "#660066"), # Purple (Fantasy)
-    ("#FFD700", "#FFA500", "#CCAA00"), # Gold (Adventure)
-    ("#F08080", "#CD5C5C", "#C86060"), # LightCoral (Drama)
-    ("#00CED1", "#20B2AA", "#00A5A8"), # DarkTurquoise (Thriller)
-    ("#FF69B4", "#FFC0CB", "#CC5090"), # HotPink (Romance)
-    ("#D2B48C", "#F5DEB3", "#B39572"), # Tan (History)
-    ("#B0C4DE", "#778899", "#89A0B8"), # LightSteelBlue (Mystery)
-    ("#6A5ACD", "#8470FF", "#5446A4"), # SlateBlue (Crime)
-    ("#5F9EA0", "#87CEEB", "#4C7F80"), # CadetBlue (Western)
+    ("#F8B195", "#F67280", "#E87A90"), # Salmon Pink
+    ("#35D0BA", "#45B8AC", "#30A89C"), # Mint Green
+    ("#6C5B7B", "#C06C84", "#A85C74"), # Muted Violet
+    ("#84B9A7", "#A4C3A3", "#90B090"), # Sage Green
+    ("#E9F2F9", "#A2C3CC", "#8BB0BC"), # Light Blue
+    ("#FFC3A0", "#FFAD7F", "#E69C7A"), # Peach
+    ("#E6A4B4", "#F4C4D4", "#D899A9"), # Baby Pink
+    ("#87CEEB", "#ADD8E6", "#73B8D4"), # Sky Blue
+    ("#F0E68C", "#FFFACD", "#D8D07C"), # Khaki Yellow
+    ("#B39EB5", "#D2B4DE", "#A18EC8"), # Lavender
+    ("#FFDAB9", "#FFE4C4", "#E6C9A9"), # Peach Puff
+    ("#D2D792", "#E0E3B6", "#C1C585"), # Muted Lime
 ]
 
 # Danh sách 23 thể loại từ dữ liệu
@@ -141,7 +141,6 @@ def load_and_preprocess_static_data():
                  df_movies['recency_score'] = (df_movies['Năm phát hành'] - min_year) / (max_year - min_year)
             else:
                  df_movies['recency_score'] = 0.5 
-
         else:
             df_movies['recency_score'] = df_movies["popularity_norm"] * 0.1 
 
@@ -243,18 +242,17 @@ def toggle_reg_topic(topic):
         st.session_state['selected_reg_topics'].add(topic)
 
 # ------------------------------------------------------------------------------
-# UI: CÁC HÀM VẼ GIAO DIỆN VÀ CSS (DARK THEME - RO PHIM STYLE)
+# UI: CÁC HÀM VẼ GIAO DIỆN VÀ CSS (PASTEL THEME)
 # ------------------------------------------------------------------------------
 
-def inject_dark_theme():
-    """Tiêm CSS để tạo giao diện Dark Theme (Phong cách Rophim)."""
-    # Màu sắc chủ đạo Dark Theme
-    BG_COLOR = "#0F1113"      # Nền rất tối (Gần đen)
-    CARD_BG = "#1A1D20"       # Nền Card/Dashboard
-    TEXT_COLOR = "#E0E0E0"    # Màu chữ sáng
-    PRIMARY_COLOR = "#FF4500" # Màu cam nhấn (OrangeRed)
-    SECONDARY_BG = "#2B2D30"  # Sidebar và background phụ
-    ACCENT_COLOR = "#1E90FF"  # Màu nhấn phụ (Blue)
+def inject_pastel_theme():
+    """Tiêm CSS để tạo giao diện Pastel Theme cho Streamlit."""
+    # Màu sắc chủ đạo Pastel
+    BG_COLOR = "#F7F5F2"      # Nền rất nhạt (Creamy White)
+    TEXT_COLOR = "#333333"    # Màu chữ đậm
+    PRIMARY_COLOR = "#FFAD7F" # Màu cam đào (Peach) - Dùng cho nút chính
+    SECONDARY_BG = "#EAE7DC"  # Sidebar và background phụ (Grayish Beige)
+    ACCENT_COLOR = "#C06C84"  # Màu nhấn (Muted Rose)
 
     st.markdown(f"""
     <style>
@@ -268,130 +266,62 @@ def inject_dark_theme():
         [data-testid="stSidebar"] {{
             background-color: {SECONDARY_BG};
             color: {TEXT_COLOR};
-            border-right: 2px solid {PRIMARY_COLOR}50; /* Viền mỏng */
+            border-right: 2px solid {ACCENT_COLOR}30; /* Viền mỏng */
         }}
         
         /* Header và Title */
-        h1, h2, h3, h4, .st-emotion-cache-10trblm {{ /* Lớp chứa tiêu đề */
-            color: {PRIMARY_COLOR};
-            font-weight: 700;
+        h1, h2, h3, h4 {{
+            color: {ACCENT_COLOR};
+            font-weight: 600;
         }}
         
         /* Nút chính (Đăng ký/Tìm kiếm) */
         .stButton button {{
-            border-radius: 6px;
+            border-radius: 8px;
             padding: 10px 15px;
             font-weight: bold;
             transition: all 0.2s ease-in-out;
             cursor: pointer;
         }}
         
-        /* Nút Primary */
+        /* Nút Primary (ví dụ: nút "Hoàn Tất Đăng Ký") */
         .stButton button[kind="primary"] {{
             background-color: {PRIMARY_COLOR};
-            color: {BG_COLOR};
+            color: white;
             border: 2px solid {PRIMARY_COLOR};
         }}
         .stButton button[kind="primary"]:hover {{
-            background-color: {ACCENT_COLOR}; /* Đổi màu khi hover */
+            background-color: {ACCENT_COLOR};
             border-color: {ACCENT_COLOR};
             color: white;
         }}
 
-        /* Nút Secondary (Login/Register) */
-        .stButton button[kind="secondary"] {{
-            background-color: {SECONDARY_BG};
-            color: {TEXT_COLOR};
-            border: 1px solid {SECONDARY_BG};
-        }}
-        .stButton button[kind="secondary"]:hover {{
-            background-color: {ACCENT_COLOR}30;
-            border-color: {ACCENT_COLOR};
-            color: {TEXT_COLOR};
-        }}
-        
-
         /* Info boxes */
         [data-testid="stInfo"], [data-testid="stSuccess"], [data-testid="stWarning"] {{
-            background-color: {CARD_BG}AA; /* Nền card mờ */
+            background-color: {SECONDARY_BG}AA; /* Nền nhẹ nhàng hơn */
             border-left: 5px solid {ACCENT_COLOR};
             border-radius: 8px;
             padding: 10px;
             color: {TEXT_COLOR};
         }}
         
-        /* Dataframe */
-        .stDataFrame {{
-            background-color: {CARD_BG};
+        /* Selectbox và Slider */
+        .stSelectbox, .stSlider {{
+            padding: 10px 0;
         }}
-
-        /* --- CSS CHO CÁC THẺ (CARD) VÀ GRID --- */
+        
+        /* --- CSS CHO CÁC THẺ (CARD) TÙY CHỈNH --- */
+        /* Đảm bảo nút trong giao diện chọn thể loại có nền gradient và không bị ảnh hưởng bởi style Streamlit mặc định */
         div[data-testid*="stButton"] > button {{
              border: none; 
              transition: all 0.2s ease-in-out;
-             color: white !important;
-        }}
-
-        /* Custom Grid Container */
-        .movie-grid-container {{
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 20px;
-            padding: 10px;
-        }}
-        
-        /* Custom Movie Card Style */
-        .movie-card {{
-            background-color: {CARD_BG};
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-            transition: transform 0.3s, box-shadow 0.3s;
-            cursor: pointer;
-            height: 100%; /* Giữ chiều cao linh hoạt trong grid item */
-        }}
-        .movie-card:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 8px 15px rgba(255, 69, 0, 0.4); /* Shadow cam nổi bật */
-        }}
-        .movie-poster {{
-            width: 100%;
-            height: 250px; /* Chiều cao cố định cho poster */
-            background-color: {SECONDARY_BG};
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: {TEXT_COLOR}80;
-            font-size: 14px;
-            font-weight: 500;
-        }}
-        .movie-info {{
-            padding: 10px;
-            min-height: 80px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }}
-        .movie-title {{
-            font-size: 1rem;
-            font-weight: 600;
-            color: {TEXT_COLOR};
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-        }}
-        .movie-score {{
-            font-size: 0.9rem;
-            color: {PRIMARY_COLOR};
-            font-weight: bold;
-            margin-top: 5px;
         }}
     </style>
     """, unsafe_allow_html=True)
 
 
 def draw_registration_topic_cards():
-    """Vẽ giao diện chọn chủ đề (Topic) thay vì chọn từng genre lẻ. DARK THEME."""
+    """Vẽ giao diện chọn chủ đề (Topic) thay vì chọn từng genre lẻ."""
     
     st.markdown("### Bạn thích thể loại nào?")
     st.caption("Chọn các thể loại bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
@@ -404,8 +334,8 @@ def draw_registration_topic_cards():
         is_selected = topic in st.session_state['selected_reg_topics']
         
         # Style động: Nếu chọn thì có viền sáng/shadow
-        border_style = "border: 3px solid #FF4500;" if is_selected else "border: none;" # Màu nhấn Cam
-        selected_shadow = "box-shadow: 0 0 18px rgba(255, 69, 0, 0.7);" if is_selected else "box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);"
+        border_style = "border: 3px solid #C06C84;" if is_selected else "border: none;" # Màu nhấn Pastel
+        selected_shadow = "box-shadow: 0 0 18px rgba(192, 108, 132, 0.7);" if is_selected else "box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);"
         opacity = "1.0" if is_selected else "0.9"
         
         # Tạo style riêng cho từng nút
@@ -413,7 +343,7 @@ def draw_registration_topic_cards():
             /* Base style - sử dụng gradient */
             background: linear-gradient(135deg, {data['color']}, {data['gradient']});
             color: white;
-            border-radius: 6px;
+            border-radius: 10px;
             height: 80px; 
             font-weight: bold;
             font-size: 0.95rem;
@@ -425,6 +355,7 @@ def draw_registration_topic_cards():
             opacity: {opacity};
             cursor: pointer;
             
+            /* Dùng flexbox để căn giữa chữ */
             display: flex; 
             align-items: center; 
             justify-content: center;
@@ -437,7 +368,7 @@ def draw_registration_topic_cards():
                 background: {data['hover_color']}; /* Đổi màu nền khi hover */
                 transform: scale(1.03);
                 box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-                border-color: #FF4500 !important; /* Màu nhấn Cam khi hover */
+                border-color: #C06C84 !important; /* Màu nhấn Pastel khi hover */
                 opacity: 1.0;
                 color: white;
             }}
@@ -472,128 +403,62 @@ def draw_registration_topic_cards():
             """, unsafe_allow_html=True)
 
 
-def register_new_user_form(df_movies, cosine_sim):
-    """Form đăng ký người dùng mới."""
-    st.header("📝 Đăng Ký Tài Khoản Mới")
-    st.info("📢 Người dùng mới sẽ chỉ tồn tại trong phiên làm việc hiện tại.")
-
-    df_users = st.session_state['df_users']
+def draw_interest_cards_guest():
+    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1. Đã áp dụng CSS mới."""
+    st.header("Bạn đang quan tâm gì?")
+    st.markdown("Chọn một chủ đề để nhận đề xuất ngay:")
     
-    # 1. Nhập tên người dùng
-    username = st.text_input("Tên người dùng mới (Duy nhất):", key="reg_username").strip()
-
-    st.write("---")
-
-    # 2. Chọn chủ đề
-    draw_registration_topic_cards()
+    topics = list(INTRO_TOPICS.keys())
+    cols = st.columns(4)
     
-    selected_topics = list(st.session_state['selected_reg_topics'])
-    
-    st.write("")
-    if selected_topics:
-        st.success(f"✅ Đã chọn: {', '.join(selected_topics)}")
-    else:
-        st.warning("Vui lòng chọn ít nhất 1 thể loại.")
+    for i, topic in enumerate(topics):
+        data = INTRO_TOPICS[topic]
+        btn_style = f"""
+            /* Base style - sử dụng gradient */
+            background: linear-gradient(135deg, {data['color']}, {data['gradient']});
+            color: white;
+            border-radius: 10px;
+            height: 100px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            width: 100%;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease-in-out;
+        """
+        
+        # --- STYLE CHO HOVER MỚI ---
+        hover_style = f"""
+            /* Hiệu ứng HOVER: Đổi sang màu solid/gradient khác */
+            div[data-testid="stButton"] button[key="guest_{topic}"]:hover {{
+                background: {data['hover_color']}; /* Đổi màu nền khi hover */
+                transform: scale(1.03);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+                color: white;
+            }}
+        """
 
-    st.write("---")
+        with cols[i % 4]:
+            st.button(topic, key=f"guest_{topic}", on_click=select_topic, args=(topic,), use_container_width=True)
+            st.markdown(f"""
+                <style>
+                    div[data-testid="stButton"] button[key="guest_{topic}"] {{ 
+                        {btn_style} 
+                    }}
+                    {hover_style}
+                    /* Hiệu ứng ACTIVE/CLICK: nhấn chìm */
+                    div[data-testid="stButton"] button[key="guest_{topic}"]:active {{
+                        transform: scale(0.98);
+                        filter: brightness(90%);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                        color: white;
+                    }}
+                </style>
+            """, unsafe_allow_html=True)
 
-    # 3. Nút Đăng ký (Xử lý Logic lưu trữ)
-    if st.button("🚀 Hoàn Tất Đăng Ký & Đăng Nhập", type="primary", use_container_width=True):
-        if not username:
-            st.error("Vui lòng nhập tên người dùng.")
-            return
-        
-        if username in df_users['Tên người dùng'].values:
-            st.error(f"❌ Tên người dùng '{username}' đã tồn tại.")
-            return
-        
-        if not selected_topics:
-            st.error("❌ Vui lòng chọn ít nhất 1 thể loại.")
-            return
-        
-        # --- BƯỚC 1: XỬ LÝ DỮ LIỆU VÀ LƯU VÀO DF_USERS (TẠM) ---
-        mapped_genres = set()
-        for topic in selected_topics:
-            if topic in INTRO_TOPICS:
-                mapped_genres.update(INTRO_TOPICS[topic]['genres'])
-        
-        final_genres_list = list(mapped_genres)
-        
-        max_id = df_users['ID'].max() if not df_users.empty and pd.notna(df_users['ID'].max()) else 0
-        new_id = int(max_id) + 1
-        
-        # Cập nhật DataFrame người dùng
-        new_user_data = {
-            'ID': [new_id],
-            'Tên người dùng': [username],
-            '5 phim coi gần nhất': [str(final_genres_list)], 
-            'Phim yêu thích nhất': [""] 
-        }
-        new_user_df = pd.DataFrame(new_user_data)
-        st.session_state['df_users'] = pd.concat([df_users, new_user_df], ignore_index=True)
-        
-        st.session_state['logged_in_user'] = username
-        
-        # --- BƯỚC 2: TỰ ĐỘNG GỌI ĐỀ XUẤT HỒ SƠ VÀ LƯU VÀO SESSION STATE ---
-        # Gọi hàm đề xuất cho người dùng mới
-        recommendations = get_recommendations(username, df_movies)
-
-        if not recommendations.empty:
-            st.session_state['last_profile_recommendations'] = recommendations
-            st.session_state['show_profile_plot'] = True
-        else:
-            st.session_state['last_profile_recommendations'] = pd.DataFrame()
-            st.session_state['show_profile_plot'] = False
-
-        st.balloons()
-        st.success(f"🎉 Đăng ký thành công! Đã thiết lập hồ sơ theo sở thích: {', '.join(selected_topics)}.")
-        
-        # --- BƯỚC 3: CHẠY LẠI ỨNG DỤNG ĐỂ HIỂN THỊ KẾT QUẢ ĐỀ XUẤT ---
-        st.rerun() 
-
-
-def login_form():
-    """Form đăng nhập."""
-    st.header("🔑 Đăng Nhập")
-    df_users = st.session_state['df_users']
-
-    with st.form("login_form"):
-        username = st.text_input("Tên người dùng:").strip()
-        submitted = st.form_submit_button("Đăng Nhập")
-        
-        if submitted:
-            if username in df_users['Tên người dùng'].values:
-                st.session_state['logged_in_user'] = username
-                st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.rerun() 
-            else:
-                st.error("❌ Tên người dùng không tồn tại.")
-
-def authentication_page(df_movies, cosine_sim):
-    """Trang Xác thực."""
-    
-    # Inject Dark Theme CSS
-    inject_dark_theme() 
-    
-    st.title("🎬 HỆ THỐNG ĐỀ XUẤT PHIM")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        # Sử dụng type="secondary" để có màu tối/viền nhạt
-        st.button("Đăng Nhập", key="btn_login", on_click=set_auth_mode, args=('login',), use_container_width=True, type="secondary")
-    with col2:
-        st.button("Đăng Ký", key="btn_register", on_click=set_auth_mode, args=('register',), use_container_width=True, type="secondary")
-
-    st.write("---")
-    
-    if st.session_state['auth_mode'] == 'login':
-        login_form()
-        st.write("")
-        st.subheader("Hoặc:")
-        st.button("🚀 Thử Dùng Với Chế Độ Khách (Zero-Click)", key="btn_guest", on_click=login_as_guest, type="primary")
-    
-    elif st.session_state['auth_mode'] == 'register':
-        register_new_user_form(df_movies, cosine_sim)
 
 # ==============================================================================
 # III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
@@ -601,9 +466,10 @@ def authentication_page(df_movies, cosine_sim):
 
 # Tạo danh sách màu sắc rực rỡ và dễ phân biệt
 def get_vibrant_colors(n):
-    """Tạo n màu sắc phù hợp với Dark Theme."""
-    # Dùng colormap 'Spectral' hoặc 'nipy_spectral'
-    cmap = plt.cm.get_cmap('Spectral', n)
+    """Tạo n màu sắc Pastel/Muted (dịu) để phù hợp với theme."""
+    # Dùng colormap 'Set3' hoặc 'Pastel1' để lấy các màu Pastel
+    cmap = plt.cm.get_cmap('Set3', n)
+    # Lấy màu và chuyển đổi sang mã HEX
     colors = [mcolors.rgb2hex(cmap(i)[:3]) for i in range(n)]
     return colors
 
@@ -640,7 +506,7 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
     # Sắp xếp theo điểm số để biểu đồ trực quan hơn
     df_plot = df_results.sort_values(by=score_col, ascending=True).copy()
     
-    # 2. Tạo màu sắc riêng cho mỗi phim (Dark Theme Palette)
+    # 2. Tạo màu sắc riêng cho mỗi phim (Pastel)
     num_movies = len(df_plot)
     colors = get_vibrant_colors(num_movies)
 
@@ -649,29 +515,23 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
     
     # Dùng biểu đồ cột dọc
     bars = ax.bar(df_plot['Tên phim'], df_plot[score_col], 
-                   color=colors, edgecolor='#E0E0E0', alpha=0.9) # Viền nhạt
-    
-    # Cấu hình Dark Theme cho Matplotlib
-    BG_COLOR_MPL = "#0F1113"
-    TEXT_COLOR_MPL = "#E0E0E0"
-    
-    ax.set_facecolor(BG_COLOR_MPL)
-    fig.patch.set_facecolor(BG_COLOR_MPL)
+                   color=colors, edgecolor='#333333', alpha=0.8) # Viền đậm nhẹ cho nổi
 
     # 4. Thêm nhãn giá trị lên thanh
     for bar in bars:
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2, height + ax.get_ylim()[1]*0.01, 
-                f'{height:.2f}', ha='center', va='bottom', fontsize=10, weight='bold', rotation=45, color=TEXT_COLOR_MPL)
+                f'{height:.2f}', ha='center', va='bottom', fontsize=10, weight='bold', rotation=45)
 
     # Thiết lập màu sắc và font cho biểu đồ
-    ax.set_title(title, fontsize=14, color='#FF4500') # Màu nhấn Cam
-    ax.set_xlabel("Tên Phim", color=TEXT_COLOR_MPL)
-    ax.set_ylabel(y_label, color=TEXT_COLOR_MPL)
-    ax.tick_params(axis='x', colors=TEXT_COLOR_MPL)
-    ax.tick_params(axis='y', colors=TEXT_COLOR_MPL)
-    ax.spines['left'].set_color(TEXT_COLOR_MPL)
-    ax.spines['bottom'].set_color(TEXT_COLOR_MPL)
+    ax.set_title(title, fontsize=14, color='#C06C84') # Màu nhấn Pastel
+    ax.set_xlabel("Tên Phim", color='#333333')
+    ax.set_ylabel(y_label, color='#333333')
+    ax.tick_params(axis='x', colors='#333333')
+    ax.tick_params(axis='y', colors='#333333')
+    ax.spines['left'].set_color('#333333')
+    ax.spines['bottom'].set_color('#333333')
+    ax.set_facecolor('#F7F5F2') # Nền biểu đồ nhẹ
     
     # Xoay nhãn trục X để tránh chồng chéo
     plt.xticks(rotation=45, ha='right', fontsize=10)
@@ -707,8 +567,7 @@ def get_zero_click_recommendations(df_movies, selected_genres, num_recommendatio
         df['combined_zero_click_score'] = df['base_zero_click_score']
 
     recommended_df = df.sort_values(by='combined_zero_click_score', ascending=False)
-    # Lấy thông tin Năm phát hành để hiển thị trên Card
-    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Năm phát hành', 'combined_zero_click_score']].head(num_recommendations)
+    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'combined_zero_click_score']].head(num_recommendations)
 
 
 def get_recommendations(username, df_movies, num_recommendations=10):
@@ -716,8 +575,7 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     user_row = df_users[df_users['Tên người dùng'] == username]
     if user_row.empty: return pd.DataFrame() # Kiểm tra rỗng
 
-    # FIX LỖI: Sử dụng .values[0] để truy cập giá trị string một cách an toàn
-    user_genres_str = user_row['5 phim coi gần nhất'].values[0]
+    user_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
     user_genres_list = []
     
     try:
@@ -732,8 +590,8 @@ def get_recommendations(username, df_movies, num_recommendations=10):
         
     user_genres = set(user_genres_list)
     
-    # Lấy phim yêu thích (nếu có) để boost thêm - Dùng .values[0]
-    favorite_movie = user_row['Phim yêu thích nhất'].values[0]
+    # Lấy phim yêu thích (nếu có) để boost thêm
+    favorite_movie = user_row['Phim yêu thích nhất'].iloc[0]
     if favorite_movie:
         favorite_movie_genres = df_movies[df_movies['Tên phim'] == favorite_movie]['parsed_genres'].iloc[0] if not df_movies[df_movies['Tên phim'] == favorite_movie].empty else set()
         user_genres.update(favorite_movie_genres)
@@ -744,8 +602,7 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     candidate_movies['Similarity_Score'] = candidate_movies['parsed_genres'].apply(lambda x: len(x.intersection(user_genres)))
 
     recommended_df = candidate_movies.sort_values(by=['Similarity_Score', 'Độ phổ biến'], ascending=[False, False])
-    # Lấy thông tin Năm phát hành để hiển thị trên Card
-    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Năm phát hành', 'Similarity_Score']].head(num_recommendations)
+    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Similarity_Score']].head(num_recommendations)
 
 def get_movie_index(movie_name, df_movies):
     try:
@@ -766,49 +623,7 @@ def recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine
     df_result['weighted_score'] = (weight_sim * df_result['similarity'] + weight_pop * df_result['popularity_norm'])
     df_result = df_result.drop(df_result[df_result['Tên phim'] == movie_name].index)
     df_result = df_result.sort_values(by='weighted_score', ascending=False)
-    # Lấy thông tin Năm phát hành để hiển thị trên Card
-    return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Năm phát hành', 'Thể loại phim']].head(10)
-
-def display_movie_grid(df_results, score_column, num_cols=5):
-    """Hiển thị kết quả đề xuất dưới dạng lưới phim (movie grid) với Poster Placeholder."""
-    
-    if df_results.empty:
-        st.warning("Không có phim nào để hiển thị.")
-        return
-
-    # Khởi tạo HTML cho lưới
-    grid_html = '<div class="movie-grid-container">'
-    
-    for index, row in df_results.iterrows():
-        title = row['Tên phim']
-        score = row[score_column]
-        year = int(row.get('Năm phát hành', 'N/A'))
-        
-        # Placeholder Image URL
-        # Sử dụng API Placeholder đơn giản và chuyển tên phim thành chuỗi URL an toàn
-        placeholder_text = title.replace(' ', '+')
-        placeholder_url = f"https://placehold.co/180x250/1A1D20/FF4500?text={placeholder_text}"
-
-        
-        # Dùng Score làm điểm hiển thị chính
-        score_display = f"ĐIỂM: {score:.2f}" if isinstance(score, (int, float)) else "N/A"
-        
-        card_html = f"""
-        <div class="movie-card">
-            <div class="movie-poster" style="background-image: url('{placeholder_url}'); background-size: cover; background-position: center; border-bottom: 3px solid #FF450080;">
-                <span style="background-color: #0F1113A0; padding: 5px; border-radius: 5px;">{year}</span>
-            </div>
-            <div class="movie-info">
-                <div class="movie-title" title="{title}">{title}</div>
-                <div class="movie-score">{score_display}</div>
-            </div>
-        </div>
-        """
-        grid_html += card_html
-        
-    grid_html += '</div>'
-    
-    st.markdown(grid_html, unsafe_allow_html=True)
+    return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim']].head(10)
 
 
 # ==============================================================================
@@ -817,8 +632,8 @@ def display_movie_grid(df_results, score_column, num_cols=5):
 
 def main_page(df_movies, cosine_sim):
     
-    # Inject Dark Theme CSS
-    inject_dark_theme() 
+    # Inject Pastel Theme CSS
+    inject_pastel_theme() 
     
     is_guest = st.session_state['logged_in_user'] == GUEST_USER
     username_display = "Khách" if is_guest else st.session_state['logged_in_user']
@@ -827,6 +642,7 @@ def main_page(df_movies, cosine_sim):
     st.sidebar.title("Menu Đề Xuất")
     
     if is_guest:
+        # Giữ nguyên logic Guest Mode
         st.header("🔥 Đề xuất Zero-Click")
         if not st.session_state['selected_intro_topics']:
             draw_interest_cards_guest()
@@ -850,15 +666,10 @@ def main_page(df_movies, cosine_sim):
             
             if not st.session_state['last_guest_result'].empty:
                 st.subheader("✅ 15 Phim Đề Xuất:")
-                # HIỂN THỊ DƯỚI DẠNG GRID
-                display_movie_grid(st.session_state['last_guest_result'], 'combined_zero_click_score')
+                st.dataframe(st.session_state['last_guest_result'], use_container_width=True)
                 
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_guest_plot'], key="plot_guest_check"):
                     plot_recommendation_comparison(st.session_state['last_guest_result'], "Zero-Click")
-                
-                # Hiển thị DataFrame chi tiết (tùy chọn)
-                with st.expander("Xem chi tiết dưới dạng bảng"):
-                    st.dataframe(st.session_state['last_guest_result'], use_container_width=True)
             
             if st.sidebar.button("Đăng Xuất Khách", on_click=logout, use_container_width=True): pass
 
@@ -868,6 +679,7 @@ def main_page(df_movies, cosine_sim):
         username = st.session_state['logged_in_user']
         user_row = df_users[df_users['Tên người dùng'] == username]
         
+        # Kiểm tra nếu user_row rỗng (có thể do lỗi tải data hoặc user mới bị mất)
         if user_row.empty:
             st.error("Lỗi: Không tìm thấy hồ sơ người dùng trong hệ thống. Vui lòng đăng nhập lại.")
             st.session_state['logged_in_user'] = None
@@ -884,6 +696,7 @@ def main_page(df_movies, cosine_sim):
         st.sidebar.write("-" * 20)
 
         if menu_choice == 'Đề xuất theo Tên Phim':
+            # Giữ nguyên logic Content-Based
             st.header("1️⃣ Đề xuất theo Nội dung")
             movie_titles_list = get_unique_movie_titles(df_movies)
             default_movie = st.session_state['last_sim_movie'] if st.session_state['last_sim_movie'] in movie_titles_list else movie_titles_list[0]
@@ -903,24 +716,20 @@ def main_page(df_movies, cosine_sim):
 
             if not st.session_state['last_sim_result'].empty:
                 st.subheader(f"🎬 Đề xuất cho '{st.session_state['last_sim_movie']}':")
-                # HIỂN THỊ DƯỚI DẠNG GRID
-                display_movie_grid(st.session_state['last_sim_result'], 'weighted_score')
-
+                st.dataframe(st.session_state['last_sim_result'], use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_sim_plot'], key="plot_sim_check"):
                     plot_recommendation_comparison(st.session_state['last_sim_result'], "Tên Phim", movie_name=st.session_state['last_sim_movie'])
-                
-                with st.expander("Xem chi tiết dưới dạng bảng"):
-                    st.dataframe(st.session_state['last_sim_result'], use_container_width=True)
-
 
         elif menu_choice == 'Đề xuất theo AI':
+            # CẬP NHẬT TIÊU ĐỀ
             st.header("2️⃣ Đề xuất theo AI")
             
+            # Logic TỰ ĐỘNG GỌI ĐỀ XUẤT NẾU LÀ ĐĂNG KÝ MỚI
             is_new_registration_with_results = (
                 not st.session_state['last_profile_recommendations'].empty and
                 'last_profile_recommendations' in st.session_state and 
-                user_row['Phim yêu thích nhất'].values[0] == "" and 
-                user_row['5 phim coi gần nhất'].values[0] != "[]" 
+                user_row['Phim yêu thích nhất'].iloc[0] == "" and 
+                user_row['5 phim coi gần nhất'].iloc[0] != "[]" 
             )
 
             if is_new_registration_with_results:
@@ -939,20 +748,16 @@ def main_page(df_movies, cosine_sim):
                 if not is_new_registration_with_results: 
                     st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn:")
                 
-                # HIỂN THỊ DƯỚI DẠNG GRID
-                display_movie_grid(recommendations, 'Similarity_Score')
-
+                st.dataframe(recommendations, use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI")
-                
-                with st.expander("Xem chi tiết dưới dạng bảng"):
-                    st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
-
 
         elif menu_choice == 'Đề xuất theo Thể loại Yêu thích':
+            # --- LOGIC MỚI: HIỂN THỊ THỂ LOẠI VÀ CHẠY LẠI ĐỀ XUẤT ---
             st.header("3️⃣ Đề xuất theo Thể loại Yêu thích")
             
-            recent_genres_str = user_row['5 phim coi gần nhất'].values[0]
+            # Lấy dữ liệu an toàn
+            recent_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
             recent_genres = []
             try:
                 recent_genres = ast.literal_eval(recent_genres_str)
@@ -981,14 +786,9 @@ def main_page(df_movies, cosine_sim):
             if not st.session_state['last_profile_recommendations'].empty:
                 st.write("---")
                 st.subheader("Kết quả Đề xuất AI gần nhất:")
-                # HIỂN THỊ DƯỚI DẠNG GRID
-                display_movie_grid(st.session_state['last_profile_recommendations'], 'Similarity_Score')
-
+                st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI (Theo Thể loại)")
-                
-                with st.expander("Xem chi tiết dưới dạng bảng"):
-                    st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
 
 
 if __name__ == '__main__':
@@ -998,4 +798,5 @@ if __name__ == '__main__':
     if st.session_state['logged_in_user']:
         main_page(df_movies, cosine_sim)
     else:
+        # Truyền df_movies và cosine_sim vào authentication_page
         authentication_page(df_movies, cosine_sim)
