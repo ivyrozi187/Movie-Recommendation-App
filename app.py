@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import ast
+import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
-import matplotlib.pyplot as plt # Import này là cần thiết cho biểu đồ
+import sys
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
@@ -66,14 +67,12 @@ def load_and_preprocess_static_data():
 
 def initialize_user_data():
     """Khởi tạo hoặc tải dữ liệu người dùng vào Session State."""
-    # Chỉ tải dữ liệu người dùng ban đầu một lần
     if 'df_users' not in st.session_state:
         try:
             df_users = load_data(USER_DATA_FILE)
             df_users.columns = [col.strip() for col in df_users.columns]
             df_users['ID'] = pd.to_numeric(df_users['ID'], errors='coerce')
         except:
-             # Tạo DataFrame rỗng nếu file lỗi
              df_users = pd.DataFrame(columns=['ID', 'Tên người dùng', '5 phim coi gần nhất', 'Phim yêu thích nhất'])
 
         st.session_state['df_users'] = df_users
@@ -99,6 +98,7 @@ def register_new_user_form(df_movies):
 
     with st.form("register_form"):
         username = st.text_input("Tên người dùng mới (Duy nhất):").strip()
+
         st.subheader("Chọn Phim Đã Xem (Tối thiểu 5 phim để có hồ sơ tốt)")
         
         recent_list_raw = st.multiselect(
@@ -117,6 +117,7 @@ def register_new_user_form(df_movies):
         submitted = st.form_submit_button("Đăng Ký & Đăng Nhập")
 
         if submitted:
+            # 1. Kiểm tra đầu vào
             if not username:
                 st.error("Vui lòng nhập tên người dùng.")
                 return
@@ -129,9 +130,11 @@ def register_new_user_form(df_movies):
                  st.warning("Vui lòng chọn tối thiểu 5 phim đã xem gần nhất.")
                  return
             
+            # 2. Tạo ID mới
             max_id = df_users['ID'].max() if not df_users.empty and pd.notna(df_users['ID'].max()) else 0
             new_id = int(max_id) + 1
             
+            # 3. Tạo dữ liệu mới
             new_user_data = {
                 'ID': [new_id],
                 'Tên người dùng': [username],
@@ -140,8 +143,10 @@ def register_new_user_form(df_movies):
             }
             new_user_df = pd.DataFrame(new_user_data)
             
+            # 4. CẬP NHẬT SESSION STATE (KHÔNG GHI FILE)
             st.session_state['df_users'] = pd.concat([df_users, new_user_df], ignore_index=True)
             
+            # 5. Đăng nhập
             st.session_state['logged_in_user'] = username
             st.success(f"🎉 Đăng ký và đăng nhập thành công! Chào mừng, {username}.")
             st.rerun()
@@ -184,14 +189,13 @@ def authentication_page(df_movies):
         register_new_user_form(df_movies)
 
 # ==============================================================================
-# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ (Logic Giữ Nguyên)
+# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
 # ==============================================================================
 
 def get_recommendations(username, df_movies, num_recommendations=10):
     """Đề xuất phim dựa trên 5 phim người dùng xem gần nhất và sở thích thể loại."""
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
-    # ... (Logic giữ nguyên)
     if user_row.empty: return pd.DataFrame()
 
     try:
@@ -307,83 +311,6 @@ def plot_genre_popularity(movie_name, top_movies, df_movies, is_user_based=False
     ax.legend(loc='upper right')
     plt.tight_layout()
     st.pyplot(fig) # Hiển thị trên Streamlit
-
-# ==============================================================================
-# IV. GIAO DIỆN CHÍNH (MAIN PAGE)
-# ==============================================================================
-
-def main_page(df_movies, cosine_sim):
-    # Lấy dữ liệu người dùng từ Session State
-    df_users = st.session_state['df_users']
-    
-    st.title(f"🎬 Chào mừng, {st.session_state['logged_in_user']}!")
-    
-    st.sidebar.title("Menu Đề Xuất")
-    
-    menu_choice = st.sidebar.radio(
-        "Chọn chức năng:",
-        ('Đề xuất theo Tên Phim', 'Đề xuất theo Hồ Sơ', 'Đăng Xuất')
-    )
-
-    if st.sidebar.button("Đăng Xuất", key="logout_btn"):
-        st.session_state['logged_in_user'] = None
-        st.session_state['auth_mode'] = 'login'
-        st.rerun()
-        
-    st.sidebar.write("-" * 20)
-
-    if menu_choice == 'Đề xuất theo Tên Phim':
-        st.header("1️⃣ Đề xuất dựa trên Nội dung (TF-IDF)")
-        
-        movie_titles_list = get_unique_movie_titles(df_movies)
-        movie_name = st.selectbox("🎥 Chọn tên phim bạn yêu thích:", options=movie_titles_list)
-        
-        weight_sim = st.slider("⚖️ Trọng số Độ giống (Similarity)", 0.0, 1.0, 0.7, 0.1)
-        weight_pop = 1 - weight_sim
-        
-        if st.button("Tìm Đề Xuất", key="find_sim"):
-            result = recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine_sim)
-            
-            if not result.empty:
-                st.subheader(f"🎬 10 Đề xuất phim dựa trên '{movie_name}':")
-                st.dataframe(result, use_container_width=True)
-
-                if st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại"):
-                    plot_genre_popularity(movie_name,
-                                          df_movies[df_movies['Tên phim'].isin(result['Tên phim'].tolist())],
-                                          df_movies, is_user_based=False)
-            else:
-                st.warning("⚠️ Không tìm thấy đề xuất hoặc phim gốc không tồn tại.")
-
-    elif menu_choice == 'Đề xuất theo Hồ Sơ':
-        st.header("2️⃣ Đề xuất dựa trên Hồ sơ Người dùng")
-        
-        username = st.session_state['logged_in_user']
-        user_row = df_users[df_users['Tên người dùng'] == username]
-        
-        if user_row.empty:
-             st.error("Không tìm thấy hồ sơ người dùng trong phiên. Vui lòng đăng ký lại.")
-             return
-
-        # Hiển thị 5 phim đã xem gần nhất
-        recent_films_str = user_row['5 phim coi gần nhất'].iloc[0]
-        recent_films = recent_films_str.strip('[]').replace("'", "")
-        st.info(f"5 Phim đã xem gần nhất: {recent_films}")
-        
-        if st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
-            recommendations = get_recommendations(username, df_movies, num_recommendations=10)
-
-            if not recommendations.empty:
-                st.subheader(f"✅ 10 Đề xuất Phim Dành Cho Bạn:")
-                st.dataframe(recommendations, use_container_width=True)
-                
-                if st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", key="plot_profile_check"):
-                    plot_genre_popularity(None, 
-                                          df_movies[df_movies['Tên phim'].isin(recommendations['Tên phim'].tolist())], 
-                                          df_movies, is_user_based=True)
-            else:
-                st.warning("⚠️ Không có đề xuất nào được tạo. Kiểm tra dữ liệu thể loại phim đã xem.")
-
 
 # ==============================================================================
 # V. CHẠY ỨNG DỤNG CHÍNH
