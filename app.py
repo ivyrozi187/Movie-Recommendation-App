@@ -18,13 +18,6 @@ if 'logged_in_user' not in st.session_state:
 if 'auth_mode' not in st.session_state:
     st.session_state['auth_mode'] = 'login'
 
-# KHỞI TẠO STATE CHO BIỂU ĐỒ
-if 'plot_visible_1' not in st.session_state: st.session_state['plot_visible_1'] = False
-if 'last_result_1' not in st.session_state: st.session_state['last_result_1'] = None
-if 'plot_visible_2' not in st.session_state: st.session_state['plot_visible_2'] = False
-if 'last_result_2' not in st.session_state: st.session_state['last_result_2'] = None
-
-
 # ==============================================================================
 # I. PHẦN TIỀN XỬ LÝ DỮ LIỆU & HELPERS
 # ==============================================================================
@@ -74,6 +67,7 @@ def load_and_preprocess_static_data():
 
 def initialize_user_data():
     """Khởi tạo hoặc tải dữ liệu người dùng vào Session State."""
+    # CHỈ CHẠY 1 LẦN KHI APP KHỞI ĐỘNG
     if 'df_users' not in st.session_state:
         try:
             df_users = load_data(USER_DATA_FILE)
@@ -172,7 +166,7 @@ def login_form():
             if username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = username
                 st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
@@ -199,9 +193,8 @@ def authentication_page(df_movies):
 # III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
 # ==============================================================================
 
-# ... (Các hàm đề xuất get_recommendations và recommend_movies_smart giữ nguyên) ...
-
 def get_recommendations(username, df_movies, num_recommendations=10):
+    """Đề xuất phim dựa trên 5 phim người dùng xem gần nhất và sở thích thể loại."""
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
     if user_row.empty: return pd.DataFrame()
@@ -340,7 +333,7 @@ def main_page(df_movies, cosine_sim):
     if st.sidebar.button("Đăng Xuất", key="logout_btn"):
         st.session_state['logged_in_user'] = None
         st.session_state['auth_mode'] = 'login'
-        st.rerun()
+        st.experimental_rerun()
         
     st.sidebar.write("-" * 20)
 
@@ -413,4 +406,3 @@ if __name__ == '__main__':
         main_page(df_movies, cosine_sim)
     else:
         authentication_page(df_movies)
-
