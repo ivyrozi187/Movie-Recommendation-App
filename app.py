@@ -7,17 +7,16 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 import sys 
-import random # Thêm thư viện random để tạo màu ngẫu nhiên
+import random 
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
 MOVIE_DATA_FILE = "movie_info_1000.csv"
 
 # --- CONSTANT ---
-GUEST_USER = "Guest_ZeroClick" # Định danh cho người dùng chế độ Khách
+GUEST_USER = "Guest_ZeroClick" 
 
-# Bản đồ ánh xạ chủ đề hiển thị (như trong ảnh) sang thể loại (genres) và màu sắc (CSS)
-# Giao diện này chỉ dùng cho Guest mode (Zero-Click)
+# Bản đồ ánh xạ chủ đề hiển thị (dùng cho Guest mode)
 INTRO_TOPICS = {
     "Marvel": {"genres": ["Action", "Sci-Fi", "Fantasy"], "color": "#7983e2", "gradient": "#5c67e2"},
     "4K": {"genres": ["Action", "Adventure", "Sci-Fi"], "color": "#8d90a7", "gradient": "#7e8399"},
@@ -149,8 +148,11 @@ def load_and_preprocess_static_data():
         
         # Tạo ánh xạ màu sắc cho tất cả thể loại (dùng cho giao diện đăng ký)
         genre_topics = {}
-        for genre in st.session_state['ALL_UNIQUE_GENRES']:
-            color1 = generate_random_color()
+        # Đảm bảo các màu sắc dễ nhìn và phân biệt
+        default_colors = ["#4D70B3", "#8A4D96", "#4DA277", "#D47E3E", "#A63D3D", "#4B5563"]
+        for i, genre in enumerate(st.session_state['ALL_UNIQUE_GENRES']):
+            # Dùng màu có sẵn cho các thẻ đầu, sau đó dùng random
+            color1 = default_colors[i % len(default_colors)]
             color2 = generate_random_color()
             genre_topics[genre] = {"genres": [genre], "color": color1, "gradient": color2}
         st.session_state['ALL_GENRE_TOPICS'] = genre_topics
@@ -236,10 +238,12 @@ def draw_registration_genre_cards():
     
     st.subheader("Chọn Thể Loại Bạn Yêu Thích (Tối thiểu 5 thể loại)")
     
-    # CSS để tạo kiểu thẻ từ nút Streamlit
+    # CSS TẠO KIỂU CHUNG CHO NÚT (KHÔNG BỊ RÒ RỈ VÀO CÁC NÚT ĐĂNG NHẬP/ĐĂNG KÝ)
+    # Chúng ta phải nhắm mục tiêu chính xác hơn để tránh ảnh hưởng đến các nút khác
     st.markdown("""
     <style>
-        div.stButton > button {
+        /* Tạo kiểu cơ bản cho nút, đây là giao diện thẻ chung */
+        .stButton button {
             border-radius: 15px;
             color: white;
             padding: 15px 10px;
@@ -248,21 +252,24 @@ def draw_registration_genre_cards():
             transition: transform 0.1s, box-shadow 0.1s;
             text-align: center;
             font-weight: bold;
-            height: 100px; /* Tăng chiều cao để giống thẻ hơn */
+            height: 100px; /* Chiều cao cố định để thẻ vuông vắn */
             border: 3px solid transparent;
             font-size: 1rem;
+            cursor: pointer;
         }
-        div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        /* Style cho nút Đăng ký/Đăng nhập ở trang đầu để chúng không bị ảnh hưởng */
+        /* Chỉ áp dụng style cho nút trong cột (tránh nút sidebar) */
+        div[data-testid*="stHorizontalBlock"] > div.stButton > button {
+             border-radius: 8px;
+             height: 50px;
+             font-weight: normal;
+             box-shadow: none;
+             transition: none;
+             color: inherit;
+             background-color: transparent !important;
+             border: 1px solid #ccc;
         }
-        
-        /* CSS cho thẻ đã chọn */
-        /* Lưu ý: Streamlit không cho phép CSS dựa trên trạng thái session state,
-           nên chúng ta phải tạo kiểu riêng biệt cho từng nút đã chọn.
-           Việc này sẽ được xử lý bằng cách thêm class vào tag <div> chứa button
-           hoặc dựa vào nội dung nút (không khả thi cho Streamlit)
-           Cách tiếp cận tốt nhất là dùng class riêng cho thẻ đã chọn bên dưới. */
+
     </style>
     """, unsafe_allow_html=True)
 
@@ -275,61 +282,34 @@ def draw_registration_genre_cards():
         data = genre_map.get(genre, {"color": "#4b5563", "gradient": "#374151"})
         is_selected = genre in st.session_state['selected_reg_genres']
         
-        # Tạo style cho nút dựa trên trạng thái đã chọn
+        # Style cho nút dựa trên trạng thái đã chọn
         base_style = f"background: linear-gradient(135deg, {data['color']}, {data['gradient']}); color: white;"
-        selected_style = f"border: 3px solid #f63366; box-shadow: 0 0 10px #f63366;" if is_selected else ""
-        
-        # Dùng HTML để hiển thị nội dung bên trong nút
-        button_label = f"""
-        <div style="{base_style} {selected_style} border-radius: 12px; padding: 10px; font-weight: bold; height: 100%; display: flex; align-items: center; justify-content: center;">
-            {genre}
-        </div>
-        """
+        selected_style = f"border-color: #f63366; box-shadow: 0 0 10px #f63366;" if is_selected else ""
         
         with cols[i % 4]:
-            # Do Streamlit buttons không cho phép tùy chỉnh nội dung phức tạp (HTML),
-            # Chúng ta sẽ dùng cách cũ (st.button) và tạo kiểu CSS mạnh mẽ để chúng trông giống thẻ.
-            # Tên nút sẽ là tên thể loại, màu sẽ được áp dụng qua CSS.
-            
-            # Tuy nhiên, cách đơn giản và hoạt động hiệu quả nhất trong Streamlit
-            # là tạo một thẻ Markdown bao ngoài nút bấm để tùy chỉnh style cho riêng nút đó.
-            
-            # Đây là cách triển khai đơn giản và dễ bảo trì nhất:
+            # Tạo nút Streamlit
             st.button(
                 genre,
                 key=f"toggle_reg_{genre}",
                 on_click=toggle_genre_selection,
                 args=(genre,),
                 use_container_width=True,
-                # Thay đổi style trực tiếp qua CSS injection cho nút này
             )
             
-            # Inject CSS cho nút bấm cụ thể này dựa trên style đã chọn
-            if is_selected:
-                 # Dùng key của button để nhắm mục tiêu (hơi hack nhưng hoạt động trong Streamlit)
-                st.markdown(
-                    f"""
-                    <style>
-                        div.stButton > button[data-testid*="stButton-{f'toggle_reg_{genre}'.lower()}"] {{
-                            {base_style}
-                            {selected_style}
-                        }}
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
-            else:
-                 # Áp dụng style cơ bản nếu chưa chọn
-                 st.markdown(
-                    f"""
-                    <style>
-                        div.stButton > button[data-testid*="stButton-{f'toggle_reg_{genre}'.lower()}"] {{
-                            {base_style}
-                        }}
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
+            # Inject CSS cho nút bấm cụ thể này dựa trên style đã chọn và màu gradient
+            # Việc này phải sử dụng data-testid để nhắm mục tiêu chính xác
+            st.markdown(
+                f"""
+                <style>
+                    /* Tìm nút theo key và áp dụng style thẻ/gradient */
+                    div[data-testid*="stButton-{f'toggle_reg_{genre}'.lower()}"] > button {{
+                        {base_style}
+                        {selected_style}
+                    }}
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
 
 
 def register_new_user_form(df_movies):
