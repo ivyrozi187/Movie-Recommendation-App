@@ -888,8 +888,10 @@ def display_movie_grid(df_results, score_column):
         
         # Placeholder Image URL
         placeholder_text = title.replace(' ', '+')
-        # Sử dụng màu tối cho placeholder text và màu cam cho nền/chữ (phù hợp Dark Theme)
-        placeholder_url = f"https://placehold.co/180x250/{index%06X}/FF4500?text={placeholder_text[:15]}..."
+        # SỬA LỖI: Dùng cú pháp định dạng hex chuẩn của Python để tạo màu nền ngẫu nhiên
+        # Sử dụng index modulo 0xFFFFFF (16777215) để cycle màu, và :06X để định dạng thành chuỗi hex 6 chữ số
+        hex_color = f'{index % 0xFFFFFF:06X}'
+        placeholder_url = f"https://placehold.co/180x250/{hex_color}/FF4500?text={placeholder_text[:15]}..."
 
         
         # Dùng Score làm điểm hiển thị chính
