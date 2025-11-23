@@ -118,7 +118,8 @@ def set_auth_mode(mode):
     # Reset các kết quả đề xuất khi chuyển trang
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
-    st.rerun()
+    # XÓA BỎ st.rerun() VÌ STREAMLIT TỰ ĐỘNG CHẠY LẠI
+    # st.rerun() 
 
 def logout():
     """Hàm callback để Đăng xuất."""
@@ -127,7 +128,8 @@ def logout():
     # Reset các kết quả đề xuất khi đăng xuất
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
-    st.rerun()
+    # XÓA BỎ st.rerun() VÌ STREAMLIT TỰ ĐỘNG CHẠY LẠI
+    # st.rerun() 
 # ---------------------------
 
 def register_new_user_form(df_movies):
@@ -218,10 +220,10 @@ def authentication_page(df_movies):
     col1, col2 = st.columns(2)
     
     with col1:
-        # SỬ DỤNG on_click
+        # SỬ DỤNG on_click, Streamlit sẽ tự động chạy lại
         st.button("Đăng Nhập", key="btn_login", on_click=set_auth_mode, args=('login',))
     with col2:
-        # SỬ DỤNG on_click
+        # SỬ DỤNG on_click, Streamlit sẽ tự động chạy lại
         st.button("Đăng Ký", key="btn_register", on_click=set_auth_mode, args=('register',))
 
     if st.session_state['auth_mode'] == 'login':
