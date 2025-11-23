@@ -1037,18 +1037,10 @@ def main_page(df_movies, cosine_sim):
                 st.warning("Hồ sơ của bạn chưa có thông tin thể loại yêu thích. Vui lòng đăng ký lại để thêm hoặc sử dụng chức năng Đề xuất theo Tên Phim.")
                 return
 
-            if st.button("♻️ Chạy lại Đề xuất AI theo Thể loại này", key="rerun_profile_by_genre", type="primary", use_container_width=True):
-                # Reset lịch sử khi chạy lại thủ công
-                st.session_state['recommended_movie_ids'] = set() 
-                recommendations = get_recommendations(username, df_movies)
-                if not recommendations.empty:
-                    st.session_state['last_profile_recommendations'] = recommendations
-                    st.session_state['show_profile_plot'] = True
-                    # Cập nhật lịch sử
-                    st.session_state['recommended_movie_ids'].update(set(recommendations['movie_id']))
-                else:
-                    st.warning("Chưa đủ dữ liệu để đề xuất.")
-                st.rerun()
+            # --- SỬA LỖI: Gọi lại hàm find_profile_recommendations để áp dụng logic chống lặp ---
+            if st.button("♻️ Chạy lại Đề xuất AI theo Thể loại này", key="rerun_profile_by_genre", type="primary", use_container_width=True, on_click=find_profile_recommendations, args=(username, df_movies)):
+                # Logic đã được chuyển vào find_profile_recommendations
+                pass
             
             # Hiển thị kết quả đề xuất gần nhất nếu có
             if not st.session_state['last_profile_recommendations'].empty:
