@@ -167,15 +167,30 @@ def load_and_preprocess_static_data():
 
 
 def initialize_user_data():
+    """Khởi tạo hoặc tải dữ liệu người dùng vào Session State, đảm bảo các cột cần thiết tồn tại."""
     if 'df_users' not in st.session_state:
+        REQUIRED_USER_COLUMNS = ['ID', 'Tên người dùng', '5 phim coi gần nhất', 'Phim yêu thích nhất']
+        
         try:
             df_users = load_data(USER_DATA_FILE)
             df_users.columns = [col.strip() for col in df_users.columns]
+            
+            # --- FIX CHO LỖI KEYERROR: Đảm bảo các cột cần thiết tồn tại ---
+            for col in REQUIRED_USER_COLUMNS:
+                if col not in df_users.columns:
+                    # Thêm cột bị thiếu với giá trị mặc định là chuỗi rỗng
+                    df_users[col] = "" 
+            # -----------------------------------------------------------------
+            
             df_users['ID'] = pd.to_numeric(df_users['ID'], errors='coerce')
             df_users = df_users.dropna(subset=['ID'])
+            
         except Exception:
-            df_users = pd.DataFrame(columns=['ID', 'Tên người dùng', '5 phim coi gần nhất', 'Phim yêu thích nhất'])
+            # Fallback nếu không thể tải file
+            df_users = pd.DataFrame(columns=REQUIRED_USER_COLUMNS)
+
         st.session_state['df_users'] = df_users
+    
     return st.session_state['df_users']
 
 def get_unique_movie_titles(df_movies):
@@ -474,6 +489,7 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     user_genres = set(user_genres_list)
     
     # Lấy phim yêu thích (nếu có) để boost thêm
+    # Do đã đảm bảo cột này tồn tại ở initialize_user_data, việc truy cập là an toàn
     favorite_movie = user_row['Phim yêu thích nhất'].iloc[0]
     if favorite_movie:
         favorite_movie_genres = df_movies[df_movies['Tên phim'] == favorite_movie]['parsed_genres'].iloc[0] if not df_movies[df_movies['Tên phim'] == favorite_movie].empty else set()
