@@ -20,24 +20,20 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 GUEST_USER = "Guest_ZeroClick" 
 
 # --- CẤU HÌNH DANH SÁCH THỂ LOẠI (TOPICS) THEO YÊU CẦU ---
-# Danh sách màu sắc cho Dark Theme
+# Danh sách màu sắc cho Light Theme (Vibrant, Bắt mắt)
 COLOR_PALETTE = [
-    ("#FF4500", "#FF6347", "#CC3700"), # OrangeRed (Action)
-    ("#1E90FF", "#4169E1", "#1773CC"), # DodgerBlue (Sci-Fi)
-    ("#3CB371", "#66CDAA", "#309C60"), # MediumSeaGreen (Comedy)
-    ("#800080", "#BA55D3", "#660066"), # Purple (Fantasy)
-    ("#FFD700", "#FFA500", "#CCAA00"), # Gold (Adventure)
-    ("#F08080", "#CD5C5C", "#C86060"), # LightCoral (Drama)
-    ("#00CED1", "#20B2AA", "#00A5A8"), # DarkTurquoise (Thriller)
-    ("#FF69B4", "#FFC0CB", "#CC5090"), # HotPink (Romance)
-    ("#D2B48C", "#F5DEB3", "#B39572"), # Tan (History)
-    ("#B0C4DE", "#778899", "#89A0B8"), # LightSteelBlue (Mystery)
-    ("#6A5ACD", "#8470FF", "#5446A4"), # SlateBlue (Crime)
-    ("#5F9EA0", "#87CEEB", "#4C7F80"), # CadetBlue (Western)
-    ("#D8A4E6", "#C780D3", "#B370C0"), # Muted Lavender
-    ("#FF8C00", "#FFA040", "#CC7000"), # Dark Orange
-    ("#8B0000", "#A52A2A", "#680000"), # Dark Red
-    ("#483D8B", "#6A5ACD", "#3A316E"), # Dark Slate Blue
+    ("#00BCD4", "#26C6DA", "#00AABF"), # Cyan/Teal (Primary Theme)
+    ("#FF5722", "#FF7043", "#E64A19"), # Deep Orange
+    ("#4CAF50", "#81C784", "#388E3C"), # Green
+    ("#9C27B0", "#BA68C8", "#7B1FA2"), # Purple
+    ("#FFC107", "#FFD54F", "#FFB300"), # Amber
+    ("#2196F3", "#64B5F6", "#1976D2"), # Blue
+    ("#E91E63", "#F06292", "#C2185B"), # Pink
+    ("#8BC34A", "#AED581", "#689F38"), # Light Green
+    ("#009688", "#4DB6AC", "#00796B"), # Teal
+    ("#FF9800", "#FFB74D", "#FB8C00"), # Orange (Accent)
+    ("#795548", "#A1887F", "#5D4037"), # Brown
+    ("#607D8B", "#90A4AE", "#455A64"), # Blue Grey
 ]
 
 # Danh sách 23 thể loại từ dữ liệu
@@ -268,18 +264,18 @@ def toggle_reg_topic(topic):
         st.session_state['selected_reg_topics'].add(topic)
 
 # ------------------------------------------------------------------------------
-# UI: CÁC HÀM VẼ GIAO DIỆN VÀ CSS (FORMOTA DARK THEME)
+# UI: CÁC HÀM VẼ GIAO DIỆN VÀ CSS (LIGHT THEME - BẮT MẮT)
 # ------------------------------------------------------------------------------
 
-def inject_dark_theme():
-    """Tiêm CSS để tạo giao diện Formota Dark Theme (Sâu, tương phản cao, hiện đại)."""
-    # Màu sắc chủ đạo Formota
-    BG_COLOR = "#0C0C0C"      # Nền rất tối (Gần đen)
-    CARD_BG = "#181818"       # Nền Card/Dashboard (Tương phản cao hơn)
-    TEXT_COLOR = "#F0F0F0"    # Màu chữ sáng
-    PRIMARY_COLOR = "#FF4500" # Màu cam nhấn (OrangeRed - Dùng cho score/button)
-    SECONDARY_BG = "#2B2D30"  # Sidebar và background phụ
-    ACCENT_COLOR = "#00FFFF"  # Màu nhấn phụ (Cyan/Aqua - Dùng cho info boxes)
+def inject_light_theme():
+    """Tiêm CSS để tạo giao diện Light Theme (Sáng, Tương phản cao, Bắt mắt)."""
+    # Màu sắc chủ đạo Light Theme
+    BG_COLOR = "#F7F9FC"      # Nền rất sáng
+    CARD_BG = "#FFFFFF"       # Nền Card
+    TEXT_COLOR = "#333333"    # Màu chữ tối
+    PRIMARY_COLOR = "#00BCD4" # Màu nhấn chính (Vibrant Cyan/Teal - Bắt mắt)
+    SECONDARY_BG = "#E0F7FA"  # Sidebar/Input (Pale Cyan)
+    ACCENT_COLOR = "#FF9800"  # Màu nhấn phụ (Vibrant Orange)
 
     st.markdown(f"""
     <style>
@@ -293,14 +289,14 @@ def inject_dark_theme():
         [data-testid="stSidebar"] {{
             background-color: {SECONDARY_BG};
             color: {TEXT_COLOR};
-            border-right: 2px solid {PRIMARY_COLOR}50; /* Viền mỏng */
+            border-right: 2px solid {PRIMARY_COLOR}50;
         }}
         
-        /* Header và Title - Formota style: In đậm, màu nhấn */
-        h1, h2, h3, h4, .st-emotion-cache-10trblm {{ /* Lớp chứa tiêu đề */
+        /* Header và Title */
+        h1, h2, h3, h4, .st-emotion-cache-10trblm {{
             color: {PRIMARY_COLOR};
-            font-weight: 800; /* Rất đậm */
-            text-shadow: 0 0 5px {PRIMARY_COLOR}40;
+            font-weight: 800;
+            text-shadow: 1px 1px 2px #AAAAAA50;
         }}
         
         /* Nút chung */
@@ -315,33 +311,33 @@ def inject_dark_theme():
         /* Nút Primary (Đăng nhập/Tìm kiếm) */
         .stButton button[kind="primary"] {{
             background-color: {PRIMARY_COLOR};
-            color: {BG_COLOR};
+            color: {CARD_BG};
             border: 2px solid {PRIMARY_COLOR};
             box-shadow: 0 4px 10px {PRIMARY_COLOR}50;
         }}
         .stButton button[kind="primary"]:hover {{
             background-color: {ACCENT_COLOR}; /* Đổi màu khi hover */
             border-color: {ACCENT_COLOR};
-            color: {BG_COLOR};
+            color: {CARD_BG};
             box-shadow: 0 4px 15px {ACCENT_COLOR}90;
         }}
 
         /* Nút Secondary (Auth Switch/Guest Button) */
         .stButton button[kind="secondary"] {{
-            background-color: {SECONDARY_BG};
+            background-color: {CARD_BG};
             color: {TEXT_COLOR};
-            border: 1px solid {SECONDARY_BG};
+            border: 1px solid {PRIMARY_COLOR}50;
         }}
         .stButton button[kind="secondary"]:hover {{
-            background-color: {ACCENT_COLOR}30;
-            border-color: {ACCENT_COLOR};
+            background-color: {SECONDARY_BG};
+            border-color: {PRIMARY_COLOR};
             color: {TEXT_COLOR};
         }}
         
-        /* Info boxes - Dùng màu Cyan làm điểm nhấn */
+        /* Info boxes */
         [data-testid="stInfo"], [data-testid="stSuccess"], [data-testid="stWarning"] {{
-            background-color: {CARD_BG}AA;
-            border-left: 5px solid {ACCENT_COLOR}; /* Điểm nhấn Cyan */
+            background-color: {SECONDARY_BG}AA;
+            border-left: 5px solid {ACCENT_COLOR}; /* Điểm nhấn Orange */
             border-radius: 8px;
             padding: 10px;
             color: {TEXT_COLOR};
@@ -349,12 +345,13 @@ def inject_dark_theme():
         
         /* Input fields */
         div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] {{
-            background-color: {SECONDARY_BG};
+            background-color: {CARD_BG};
             border-radius: 6px;
             color: {TEXT_COLOR};
+            border: 1px solid #BBBBBB;
         }}
 
-        /* --- CSS CHO CÁC THẺ (CARD) VÀ GRID (FORMOTA LOOK) --- */
+        /* --- CSS CHO CÁC THẺ (CARD) VÀ GRID (LIGHT LOOK) --- */
         div[data-testid*="stButton"] > button {{
              border: none; 
              transition: all 0.2s ease-in-out;
@@ -364,32 +361,36 @@ def inject_dark_theme():
         /* Custom Grid Container */
         .movie-grid-container {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Tăng kích thước card */
-            gap: 25px; /* Tăng khoảng cách */
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 25px;
             padding: 20px;
         }}
         
         /* Custom Movie Card Style */
         .movie-card {{
             background-color: {CARD_BG};
-            border-radius: 10px; /* Góc bo tròn hơn */
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7); /* Shadow sâu, cao cấp */
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); /* Shadow nhẹ trên nền sáng */
             transition: transform 0.3s, box-shadow 0.3s;
             height: 100%;
         }}
         .movie-card:hover {{
-            transform: translateY(-8px); /* Nhảy cao */
-            box-shadow: 0 10px 30px {PRIMARY_COLOR}80; /* Shadow Cam rực rỡ */
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px {PRIMARY_COLOR}50; /* Shadow Teal rực rỡ */
         }}
         .movie-poster {{
             width: 100%;
-            height: 300px; /* Chiều cao tăng */
-            background-color: {SECONDARY_BG};
-            /* ... */
+            height: 300px;
+            background-color: {SECONDARY_BG}; /* Khối màu thay thế Poster */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            border-bottom: 5px solid {PRIMARY_COLOR}; /* Dải màu nhấn */
         }}
         .movie-info {{
-            padding: 15px; /* Padding lớn hơn */
+            padding: 15px;
         }}
         .movie-title {{
             font-size: 1.1rem;
@@ -398,19 +399,33 @@ def inject_dark_theme():
         }}
         .movie-score {{
             font-size: 1.2rem;
-            color: {PRIMARY_COLOR}; /* Điểm số nổi bật */
+            color: {PRIMARY_COLOR};
             font-weight: 800;
         }}
         .year-tag {{
-            background-color: {PRIMARY_COLOR};
-            /* ... */
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: {ACCENT_COLOR}; /* Màu Orange nổi bật */
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }}
+        .poster-text {{
+            font-size: 1.2rem;
+            color: {PRIMARY_COLOR};
+            text-align: center;
+            padding: 20px;
+            font-weight: 600;
         }}
     </style>
     """, unsafe_allow_html=True)
 
 
 def draw_registration_topic_cards():
-    """Vẽ giao diện chọn chủ đề (Topic) thay vì chọn từng genre lẻ. DARK THEME."""
+    """Vẽ giao diện chọn chủ đề (Topic) với Light Theme."""
     
     st.markdown("### Bạn thích thể loại nào?")
     st.caption("Chọn các thể loại bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
@@ -424,8 +439,8 @@ def draw_registration_topic_cards():
         is_selected = topic in st.session_state['selected_reg_topics']
         
         # Style động: Nếu chọn thì có viền sáng/shadow
-        border_style = "border: 3px solid #FF4500;" if is_selected else "border: none;" # Màu nhấn Cam
-        selected_shadow = "box-shadow: 0 0 18px rgba(255, 69, 0, 0.7);" if is_selected else "box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);"
+        border_style = "border: 3px solid #00BCD4;" if is_selected else "border: none;" # Màu nhấn Teal
+        selected_shadow = "box-shadow: 0 0 18px rgba(0, 188, 212, 0.7);" if is_selected else "box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);"
         opacity = "1.0" if is_selected else "0.9"
         
         # Tạo style riêng cho từng nút
@@ -456,8 +471,8 @@ def draw_registration_topic_cards():
             div[data-testid="stButton"] button[key="reg_topic_{topic}"]:hover {{
                 background: {data['hover_color']}; /* Đổi màu nền khi hover */
                 transform: scale(1.03);
-                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-                border-color: #FF4500 !important; /* Màu nhấn Cam khi hover */
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+                border-color: #00BCD4 !important; /* Màu nhấn Teal khi hover */
                 opacity: 1.0;
                 color: white;
             }}
@@ -493,7 +508,7 @@ def draw_registration_topic_cards():
 
 
 def draw_interest_cards_guest():
-    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1. DARK THEME."""
+    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1. LIGHT THEME."""
     st.header("Bạn đang quan tâm gì? ✨")
     st.markdown("Chọn **một** chủ đề để nhận đề xuất ngay lập tức:")
     
@@ -515,7 +530,7 @@ def draw_interest_cards_guest():
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             transition: all 0.2s ease-in-out;
         """
         
@@ -525,7 +540,7 @@ def draw_interest_cards_guest():
             div[data-testid="stButton"] button[key="guest_{topic}"]:hover {{
                 background: {data['hover_color']}; /* Đổi màu nền khi hover */
                 transform: scale(1.03);
-                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
                 color: white;
             }}
         """
@@ -648,8 +663,8 @@ def login_form():
 def authentication_page(df_movies, cosine_sim):
     """Trang Xác thực."""
     
-    # Inject Formota Dark Theme CSS
-    inject_dark_theme() 
+    # Inject Light Theme CSS
+    inject_light_theme() 
     
     st.title("🎬 HỆ THỐNG ĐỀ XUẤT PHIM")
     
@@ -657,7 +672,6 @@ def authentication_page(df_movies, cosine_sim):
     
     # Nút Đăng nhập
     with col1:
-        # Dùng type="primary" cho nút active, dùng custom CSS để tô màu active
         st.button("Đăng Nhập", key="btn_login", on_click=set_auth_mode, args=('login',), use_container_width=True, type="secondary")
     # Nút Đăng ký
     with col2:
@@ -667,11 +681,11 @@ def authentication_page(df_movies, cosine_sim):
         st.button("Khách 🚀", key="btn_guest_auth", on_click=login_as_guest, use_container_width=True, type="secondary")
 
     # Apply active style to the currently selected button
-    # Sử dụng màu PRIMARY_COLOR (Cam) cho trạng thái active
+    # Sử dụng màu PRIMARY_COLOR (#00BCD4) cho trạng thái active
     if st.session_state['auth_mode'] == 'login':
-        st.markdown("""<style>div[data-testid="column"] button[key="btn_login"] {background-color: #FF4500 !important; border-color: #FF4500 !important; color: #0C0C0C !important;}</style>""", unsafe_allow_html=True)
+        st.markdown("""<style>div[data-testid="column"] button[key="btn_login"] {background-color: #00BCD4 !important; border-color: #00BCD4 !important; color: white !important;}</style>""", unsafe_allow_html=True)
     elif st.session_state['auth_mode'] == 'register':
-        st.markdown("""<style>div[data-testid="column"] button[key="btn_register"] {background-color: #FF4500 !important; border-color: #FF4500 !important; color: #0C0C0C !important;}</style>""", unsafe_allow_html=True)
+        st.markdown("""<style>div[data-testid="column"] button[key="btn_register"] {background-color: #00BCD4 !important; border-color: #00BCD4 !important; color: white !important;}</style>""", unsafe_allow_html=True)
 
     st.write("---")
     
@@ -687,16 +701,16 @@ def authentication_page(df_movies, cosine_sim):
 
 # Tạo danh sách màu sắc rực rỡ và dễ phân biệt
 def get_vibrant_colors(n):
-    """Tạo n màu sắc phù hợp với Dark Theme."""
-    # Dùng colormap 'Spectral' hoặc 'nipy_spectral'
-    cmap = plt.cm.get_cmap('Spectral', n)
+    """Tạo n màu sắc phù hợp với Light Theme."""
+    # Dùng colormap 'tab20' hoặc 'Set1' để có màu nổi bật trên nền sáng
+    cmap = plt.cm.get_cmap('tab20', n)
     colors = [mcolors.rgb2hex(cmap(i)[:3]) for i in range(n)]
     return colors
 
 def plot_recommendation_comparison(df_results, recommendation_type, movie_name=None):
     """
     Vẽ biểu đồ so sánh điểm số đề xuất (hoặc độ phổ biến) của các phim.
-    Thiết lập cho Dark Theme.
+    Thiết lập cho Light Theme.
     """
     if df_results.empty:
         st.warning("Không có dữ liệu để vẽ biểu đồ.")
@@ -727,9 +741,9 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
     num_movies = len(df_plot)
     colors = get_vibrant_colors(num_movies)
 
-    # Cấu hình Dark Theme cho Matplotlib
-    BG_COLOR_MPL = "#0C0C0C" # Nền sâu
-    TEXT_COLOR_MPL = "#F0F0F0"
+    # Cấu hình Light Theme cho Matplotlib
+    BG_COLOR_MPL = "#F7F9FC" 
+    TEXT_COLOR_MPL = "#333333"
     
     fig, ax = plt.subplots(figsize=(10, 6)) 
     
@@ -737,7 +751,7 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
     fig.patch.set_facecolor(BG_COLOR_MPL)
     
     bars = ax.bar(df_plot['Tên phim'], df_plot[score_col], 
-                      color=colors, edgecolor=TEXT_COLOR_MPL, alpha=0.9)
+                      color=colors, edgecolor='#333333', alpha=0.9)
 
     for bar in bars:
         height = bar.get_height()
@@ -745,7 +759,7 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
                 f'{height:.2f}', ha='center', va='bottom', fontsize=10, weight='bold', rotation=45, color=TEXT_COLOR_MPL)
 
     # Thiết lập màu sắc và font cho biểu đồ
-    ax.set_title(title, fontsize=14, color='#FF4500') # Màu nhấn Cam
+    ax.set_title(title, fontsize=14, color='#00BCD4') # Màu nhấn Teal
     ax.set_xlabel("Tên Phim", color=TEXT_COLOR_MPL)
     ax.set_ylabel(y_label, color=TEXT_COLOR_MPL)
     ax.tick_params(axis='x', colors=TEXT_COLOR_MPL)
@@ -863,12 +877,9 @@ def display_movie_grid(df_results, score_column):
         # Xử lý Năm phát hành, đảm bảo là số nguyên
         year = int(row.get('Năm phát hành', 'N/A')) if pd.notna(row.get('Năm phát hành')) and row.get('Năm phát hành') != "" else 'N/A'
         
-        # Placeholder Image URL
-        placeholder_text = title.replace(' ', '+')
-        # Tạo màu nền ngẫu nhiên/cycle cho placeholder
-        hex_color = f'{index % 0xFFFFFF:06X}'
-        # Cập nhật placeholder URL để có nền Card BG và chữ màu nhấn
-        placeholder_url = f"https://placehold.co/200x300/181818/FF4500?text={placeholder_text[:15]}..."
+        # Placeholder Text
+        # Sử dụng ký tự Unicode (🎬) để trang trí thay vì hình ảnh
+        poster_text = "🎬 Phim đề xuất"
 
         
         # Dùng Score làm điểm hiển thị chính
@@ -876,7 +887,8 @@ def display_movie_grid(df_results, score_column):
         
         card_html = f"""
         <div class="movie-card">
-            <div class="movie-poster" style="background-image: url('{placeholder_url}'); background-size: cover; background-position: center;">
+            <div class="movie-poster">
+                <div class="poster-text">{poster_text}</div>
                 <span class="year-tag">{year}</span>
             </div>
             <div class="movie-info">
@@ -898,8 +910,8 @@ def display_movie_grid(df_results, score_column):
 
 def main_page(df_movies, cosine_sim):
     
-    # Inject Formota Dark Theme CSS
-    inject_dark_theme() 
+    # Inject Light Theme CSS
+    inject_light_theme() 
     
     is_guest = st.session_state['logged_in_user'] == GUEST_USER
     username_display = "Khách" if is_guest else st.session_state['logged_in_user']
