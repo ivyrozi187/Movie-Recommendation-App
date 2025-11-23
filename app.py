@@ -6,16 +6,18 @@ import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
-import sys 
-import random 
+import sys
+import random
 import matplotlib.colors as mcolors
+from datetime import datetime
+import os # Dùng để kiểm tra và lưu file CSV
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
 MOVIE_DATA_FILE = "movie_info_1000.csv"
 
 # --- CONSTANT ---
-GUEST_USER = "Guest_ZeroClick" 
+GUEST_USER = "Guest_ZeroClick"
 
 # --- CẤU HÌNH DANH SÁCH THỂ LOẠI (TOPICS) THEO YÊU CẦU ---
 # Danh sách màu sắc Pastel (Pastel Dream Palette) cho các thẻ
@@ -32,32 +34,45 @@ COLOR_PALETTE = [
     ("#B39EB5", "#D2B4DE", "#A18EC8"), # Lavender
     ("#FFDAB9", "#FFE4C4", "#E6C9A9"), # Peach Puff
     ("#D2D792", "#E0E3B6", "#C1C585"), # Muted Lime
+    ("#D6C8AE", "#B79F88", "#A08A74"), # Muted Brown
+    ("#F9A03F", "#FFB74D", "#E08D35"), # Muted Orange
+    ("#DAA520", "#B8860B", "#A0760A"), # Goldenrod Muted
+    ("#5B7B7B", "#708090", "#4B5B5B"), # Slate Gray Muted
+    ("#CC76A1", "#E68FAF", "#B36A8E"), # Muted Fuchsia
+    ("#7D8A7D", "#90AA90", "#6A776A"), # Dark Sage Green
+    ("#F1F1F1", "#CCCCCC", "#E6E6E6"), # Light Gray
+    ("#C3B1E1", "#D8BFD8", "#A99BB3"), # Thistle
+    ("#9BB9AF", "#AFD8D4", "#87A39A"), # Cadet Blue Pale
+    ("#B49A67", "#D2B48C", "#9A8050"), # Tan Muted
+    ("#E0A890", "#F0C8B0", "#C8957A"), # Coral Muted
 ]
+
 
 # Danh sách 23 thể loại từ dữ liệu
 GENRES_VI = [
-    "Phim Hành Động", "Phim Giả Tượng", "Phim Hài", "Phim Kinh Dị", 
-    "Phim Phiêu Lưu", "Phim Chính Kịch", "Phim Khoa Học Viễn Tưởng", 
-    "Phim Gây Cấn", "Phim Gia Đình", "Phim Hoạt Hình", "Phim Lãng Mạn", 
-    "Phim Tài Liệu", "Phim Chiến Tranh", "Phim Bí Ẩn", "Phim Hình Sự", 
-    "Phim Viễn Tây", "Phim Cổ Trang", "Phim Nhạc", "Phim Lịch Sử", 
+    "Phim Hành Động", "Phim Giả Tượng", "Phim Hài", "Phim Kinh Dị",
+    "Phim Phiêu Lưu", "Phim Chính Kịch", "Phim Khoa Học Viễn Tưởng",
+    "Phim Gây Gấn", "Phim Gia Đình", "Phim Hoạt Hình", "Phim Lãng Mạn",
+    "Phim Tài Liệu", "Phim Chiến Tranh", "Phim Bí Ẩn", "Phim Hình Sự",
+    "Phim Viễn Tây", "Phim Cổ Trang", "Phim Nhạc", "Phim Lịch Sử",
     "Phim Thần Thoại", "Phim Truyền Hình", "Chương Trình Truyền Hình", "Phim Khác"
 ]
 
 # Tạo dictionary ánh xạ tự động
 INTRO_TOPICS = {}
 for i, genre in enumerate(GENRES_VI):
+    # Lấy màu từ danh sách, lặp lại nếu cần
     color, gradient, hover_color = COLOR_PALETTE[i % len(COLOR_PALETTE)]
     INTRO_TOPICS[genre] = {
         "genres": [genre], # Ánh xạ trực tiếp 1-1
-        "color": color, 
+        "color": color,
         "gradient": gradient,
         "hover_color": hover_color # Thêm màu hover
     }
 
 # Lưu các thể loại duy nhất sau khi tiền xử lý
 if 'ALL_UNIQUE_GENRES' not in st.session_state:
-    st.session_state['ALL_UNIQUE_GENRES'] = [] 
+    st.session_state['ALL_UNIQUE_GENRES'] = []
 
 # --- KHỞI TẠO BIẾN TRẠNG THÁI (SESSION STATE) ---
 if 'logged_in_user' not in st.session_state:
@@ -78,7 +93,7 @@ if 'selected_intro_topics' not in st.session_state: st.session_state['selected_i
 if 'last_guest_result' not in st.session_state: st.session_state['last_guest_result'] = pd.DataFrame()
 if 'show_guest_plot' not in st.session_state: st.session_state['show_guest_plot'] = False
 
-# --- BIẾN TRẠNG THÁI MỚI CHO ĐĂNG KÝ (TOPICS) ---
+# Biến trạng thái mới cho Đăng ký (TOPICS)
 if 'selected_reg_topics' not in st.session_state: st.session_state['selected_reg_topics'] = set()
 
 
@@ -104,7 +119,7 @@ def get_all_unique_genres(df_movies):
         all_genres.update(genres_set)
     return sorted(list(all_genres))
 
-@st.cache_resource 
+@st.cache_resource
 def load_and_preprocess_static_data():
     """Tải và tiền xử lý dữ liệu tĩnh (movies và mô hình)."""
     try:
@@ -140,9 +155,9 @@ def load_and_preprocess_static_data():
             if max_year > min_year:
                  df_movies['recency_score'] = (df_movies['Năm phát hành'] - min_year) / (max_year - min_year)
             else:
-                 df_movies['recency_score'] = 0.5 
+                 df_movies['recency_score'] = 0.5
         else:
-            df_movies['recency_score'] = df_movies["popularity_norm"] * 0.1 
+            df_movies['recency_score'] = df_movies["popularity_norm"] * 0.1
 
         genres_pop = {}
         for index, row in df_movies.iterrows():
@@ -151,7 +166,7 @@ def load_and_preprocess_static_data():
                 genre = genre.strip()
                 if genre:
                     genres_pop.setdefault(genre, []).append(popularity)
-        
+            
         global_genre_popularity = {g: sum(p)/len(p) for g, p in genres_pop.items() if len(p) > 0}
         max_pop = max(global_genre_popularity.values()) if global_genre_popularity else 1
         normalized_genre_pop = {g: p / max_pop for g, p in global_genre_popularity.items()}
@@ -161,7 +176,7 @@ def load_and_preprocess_static_data():
         )
         
         st.session_state['ALL_UNIQUE_GENRES'] = get_all_unique_genres(df_movies)
-        return df_movies, cosine_sim_matrix 
+        return df_movies, cosine_sim_matrix
 
     except Exception as e:
         st.error(f"LỖI TẢI HOẶC XỬ LÝ DỮ LIỆU TĨNH: {e}. Vui lòng kiểm tra các file CSV.")
@@ -171,23 +186,29 @@ def load_and_preprocess_static_data():
 def initialize_user_data():
     """Khởi tạo hoặc tải dữ liệu người dùng vào Session State, đảm bảo các cột cần thiết tồn tại."""
     if 'df_users' not in st.session_state:
-        REQUIRED_USER_COLUMNS = ['ID', 'Tên người dùng', '5 phim coi gần nhất', 'Phim yêu thích nhất']
+        REQUIRED_USER_COLUMNS = ['ID', 'Tên người dùng', '5 phim coi gần nhất', 'Phim yêu thích nhất', 'Mật khẩu']
         
         try:
-            df_users = load_data(USER_DATA_FILE)
-            df_users.columns = [col.strip() for col in df_users.columns]
-            
+            # Kiểm tra file có tồn tại không
+            if os.path.exists(USER_DATA_FILE):
+                df_users = load_data(USER_DATA_FILE)
+                df_users.columns = [col.strip() for col in df_users.columns]
+            else:
+                # Tạo DataFrame rỗng nếu file không tồn tại
+                df_users = pd.DataFrame(columns=REQUIRED_USER_COLUMNS)
+
             # --- FIX CHO LỖI KEYERROR: Đảm bảo các cột cần thiết tồn tại ---
             for col in REQUIRED_USER_COLUMNS:
                 if col not in df_users.columns:
-                    # Thêm cột bị thiếu với giá trị mặc định là chuỗi rỗng
-                    df_users[col] = "" 
+                    df_users[col] = ""
             # -----------------------------------------------------------------
             
+            # Xử lý ID
             df_users['ID'] = pd.to_numeric(df_users['ID'], errors='coerce')
             df_users = df_users.dropna(subset=['ID'])
             
-        except Exception:
+        except Exception as e:
+            st.warning(f"Lỗi khi tải file người dùng: {e}. Sử dụng DataFrame rỗng.")
             # Fallback nếu không thể tải file
             df_users = pd.DataFrame(columns=REQUIRED_USER_COLUMNS)
 
@@ -208,14 +229,17 @@ def set_auth_mode(mode):
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_reg_topics'] = set() # Reset
+    st.session_state['selected_intro_topics'] = []
+    st.session_state['last_guest_result'] = pd.DataFrame()
+
 
 def login_as_guest():
     st.session_state['logged_in_user'] = GUEST_USER
-    st.session_state['auth_mode'] = 'login' 
+    st.session_state['auth_mode'] = 'login'
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
-    st.session_state['selected_intro_topics'] = [] 
-    st.session_state['last_guest_result'] = pd.DataFrame() 
+    st.session_state['selected_intro_topics'] = []
+    st.session_state['last_guest_result'] = pd.DataFrame()
     st.rerun()
 
 def logout():
@@ -224,8 +248,9 @@ def logout():
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_intro_topics'] = []
-    st.session_state['last_guest_result'] = pd.DataFrame() 
+    st.session_state['last_guest_result'] = pd.DataFrame()
     st.session_state['selected_reg_topics'] = set()
+    st.rerun()
 
 # --- CALLBACK CHO GUEST MODE ---
 def select_topic(topic_key):
@@ -240,6 +265,25 @@ def toggle_reg_topic(topic):
         st.session_state['selected_reg_topics'].remove(topic)
     else:
         st.session_state['selected_reg_topics'].add(topic)
+
+# --- HÀM LƯU DỮ LIỆU NGƯỜI DÙNG MỚI (PERSISTENCE) ---
+def save_new_user_data(new_user_row):
+    """Lưu người dùng mới vào file CSV và cập nhật session state."""
+    df_users = st.session_state['df_users']
+    
+    # 1. Thêm hàng mới vào DataFrame hiện tại
+    # Chuyển đổi Series thành DataFrame 1 hàng để dùng pd.concat
+    new_user_df = pd.DataFrame([new_user_row], columns=df_users.columns)
+    df_updated = pd.concat([df_users, new_user_df], ignore_index=True)
+    
+    # 2. Lưu lại vào file CSV
+    try:
+        df_updated.to_csv(USER_DATA_FILE, index=False, encoding='utf-8-sig')
+        st.session_state['df_users'] = df_updated # Cập nhật Session State
+        return True
+    except Exception as e:
+        st.error(f"LỖI LƯU DỮ LIỆU: Không thể ghi vào file {USER_DATA_FILE}. Lỗi: {e}")
+        return False
 
 # ------------------------------------------------------------------------------
 # UI: CÁC HÀM VẼ GIAO DIỆN VÀ CSS (PASTEL THEME)
@@ -305,9 +349,10 @@ def inject_pastel_theme():
             color: {TEXT_COLOR};
         }}
         
-        /* Selectbox và Slider */
-        .stSelectbox, .stSlider {{
-            padding: 10px 0;
+        /* Input fields */
+        div[data-baseweb="input"], div[data-baseweb="textarea"] {{
+            background-color: {SECONDARY_BG};
+            border-radius: 6px;
         }}
         
         /* --- CSS CHO CÁC THẺ (CARD) TÙY CHỈNH --- */
@@ -316,18 +361,49 @@ def inject_pastel_theme():
              border: none; 
              transition: all 0.2s ease-in-out;
         }}
+        
+        /* Bố cục trang Đăng nhập/Đăng ký */
+        .auth-container {{
+            max-width: 600px;
+            margin: auto;
+            padding: 30px;
+            background-color: #FFFFFF; /* Nền form trắng nổi bật */
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(192, 108, 132, 0.2); /* Shadow Pastel nhẹ nhàng */
+        }}
+        .auth-button-group {{
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }}
+        .auth-button-group button {{
+            flex-grow: 1;
+            margin: 0 5px;
+            background-color: {SECONDARY_BG} !important;
+            border: 1px solid {ACCENT_COLOR}50 !important;
+            color: {TEXT_COLOR} !important;
+        }}
+        .auth-button-group button:hover {{
+            background-color: {ACCENT_COLOR}20 !important;
+        }}
+        .auth-button-group button.active {{
+            background-color: {ACCENT_COLOR} !important;
+            color: white !important;
+            border-color: {ACCENT_COLOR} !important;
+        }}
+        
     </style>
     """, unsafe_allow_html=True)
 
 
 def draw_registration_topic_cards():
-    """Vẽ giao diện chọn chủ đề (Topic) thay vì chọn từng genre lẻ."""
+    """Vẽ giao diện chọn chủ đề (Topic) thay vì chọn từng genre lẻ. (Không thay đổi)"""
     
-    st.markdown("### Bạn thích thể loại nào?")
-    st.caption("Chọn các thể loại bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
+    st.markdown("### Bạn thích thể loại nào? 🤩")
+    st.caption("Chọn **tối thiểu 5** thể loại bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
 
     topics = list(INTRO_TOPICS.keys())
-    cols = st.columns(4) 
+    cols = st.columns(4)
     
     for i, topic in enumerate(topics):
         data = INTRO_TOPICS[topic]
@@ -404,9 +480,9 @@ def draw_registration_topic_cards():
 
 
 def draw_interest_cards_guest():
-    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1. Đã áp dụng CSS mới."""
-    st.header("Bạn đang quan tâm gì?")
-    st.markdown("Chọn một chủ đề để nhận đề xuất ngay:")
+    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1. (Không thay đổi)"""
+    st.header("Bạn đang quan tâm gì? ✨")
+    st.markdown("Chọn **một** chủ đề để nhận đề xuất ngay lập tức:")
     
     topics = list(INTRO_TOPICS.keys())
     cols = st.columns(4)
@@ -461,10 +537,15 @@ def draw_interest_cards_guest():
 
 
 # ==============================================================================
-# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
+# III. CHỨC NĂNG ĐỀ XUẤT (Giữ nguyên logic)
 # ==============================================================================
 
-# Tạo danh sách màu sắc rực rỡ và dễ phân biệt
+# (Giữ nguyên các hàm đề xuất và vẽ biểu đồ từ code gốc)
+# ...
+# ... (Phần này là các hàm get_vibrant_colors, plot_recommendation_comparison, 
+#      get_zero_click_recommendations, get_recommendations, get_movie_index, 
+#      recommend_movies_smart - Giữ nguyên)
+
 def get_vibrant_colors(n):
     """Tạo n màu sắc Pastel/Muted (dịu) để phù hợp với theme."""
     # Dùng colormap 'Set3' hoặc 'Pastel1' để lấy các màu Pastel
@@ -515,7 +596,7 @@ def plot_recommendation_comparison(df_results, recommendation_type, movie_name=N
     
     # Dùng biểu đồ cột dọc
     bars = ax.bar(df_plot['Tên phim'], df_plot[score_col], 
-                   color=colors, edgecolor='#333333', alpha=0.8) # Viền đậm nhẹ cho nổi
+                      color=colors, edgecolor='#333333', alpha=0.8) # Viền đậm nhẹ cho nổi
 
     # 4. Thêm nhãn giá trị lên thanh
     for bar in bars:
@@ -625,9 +706,133 @@ def recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine
     df_result = df_result.sort_values(by='weighted_score', ascending=False)
     return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim']].head(10)
 
+# ==============================================================================
+# IV. GIAO DIỆN XÁC THỰC (ĐÃ CẢI TIẾN)
+# ==============================================================================
+
+def draw_registration_form_and_handle(df_movies):
+    """Vẽ form đăng ký và xử lý logic tạo người dùng mới."""
+    st.subheader("Đăng Ký Tài Khoản Mới 📝")
+    df_users = st.session_state['df_users']
+    
+    with st.form("registration_form"):
+        username = st.text_input("Tên người dùng", placeholder="Ví dụ: nguoimoi_2025")
+        password = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu an toàn")
+        
+        st.write("---")
+        draw_registration_topic_cards()
+        st.write("---")
+        
+        submitted = st.form_submit_button("✅ HOÀN TẤT ĐĂNG KÝ", type="primary", use_container_width=True)
+
+        if submitted:
+            # 1. Kiểm tra đầu vào
+            if not username or not password:
+                st.error("Vui lòng nhập Tên người dùng và Mật khẩu.")
+                st.stop()
+            if username in df_users['Tên người dùng'].tolist():
+                st.error(f"Tên người dùng **{username}** đã tồn tại. Vui lòng chọn tên khác.")
+                st.stop()
+            if len(st.session_state['selected_reg_topics']) < 5:
+                st.error(f"Vui lòng chọn tối thiểu **5** thể loại bạn yêu thích. Bạn đã chọn: {len(st.session_state['selected_reg_topics'])}.")
+                st.stop()
+            
+            # 2. Chuẩn bị dữ liệu người dùng mới
+            all_selected_genres = []
+            for topic in st.session_state['selected_reg_topics']:
+                all_selected_genres.extend(INTRO_TOPICS.get(topic, {}).get("genres", []))
+                
+            # Tạo ID mới
+            next_id = df_users['ID'].max() + 1 if not df_users.empty else 1
+            
+            new_user_row = {
+                'ID': next_id,
+                'Tên người dùng': username,
+                'Mật khẩu': password, # Mật khẩu chưa mã hóa (chỉ để demo)
+                # Lưu danh sách thể loại đã chọn (đã lọc rỗng)
+                '5 phim coi gần nhất': str([g.strip() for g in all_selected_genres if g.strip()]), 
+                'Phim yêu thích nhất': ""
+            }
+            
+            # 3. Lưu dữ liệu
+            if save_new_user_data(new_user_row):
+                st.success(f"🎉 Đăng ký thành công cho người dùng **{username}**!")
+                st.info("Hệ thống đang chuyển bạn đến trang chủ. Vui lòng đợi trong giây lát.")
+                
+                # Tự động đăng nhập
+                st.session_state['logged_in_user'] = username
+                st.session_state['auth_mode'] = 'login'
+                
+                # Tự động chạy đề xuất Zero-Click/Profile ban đầu (vì chưa có lịch sử xem)
+                recommendations = get_recommendations(username, df_movies)
+                if not recommendations.empty:
+                    st.session_state['last_profile_recommendations'] = recommendations
+                    st.session_state['show_profile_plot'] = True
+                
+                # Cần dùng st.rerun() để chuyển sang trang chính
+                st.rerun()
+
+
+def authentication_page(df_movies, cosine_sim):
+    """Trang Đăng nhập/Đăng ký đã được cải tiến giao diện."""
+    inject_pastel_theme()
+    
+    st.title("💖 Hệ thống Đề xuất Phim Thông minh")
+    st.subheader("Chào mừng đến với Movie Recommender AI!")
+    st.markdown("---")
+    
+    # Sử dụng HTML/CSS để tạo bố cục container nổi bật
+    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+    
+    # Group Button Đăng nhập/Đăng ký/Khách
+    cols = st.columns([1, 1, 1])
+    
+    # Nút Đăng nhập
+    if cols[0].button("Đăng Nhập", key="btn_login", use_container_width=True):
+        set_auth_mode('login')
+    # Nút Đăng ký
+    if cols[1].button("Đăng Ký", key="btn_register", use_container_width=True):
+        set_auth_mode('register')
+    # Nút Khách
+    if cols[2].button("Khách 🚀", key="btn_guest", use_container_width=True):
+        login_as_guest() # Hàm này đã có st.rerun()
+
+    st.markdown('<div class="auth-button-group">', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.write("---")
+
+    if st.session_state['auth_mode'] == 'login':
+        st.subheader("Đăng Nhập Tài Khoản 🔑")
+        df_users = st.session_state['df_users']
+        
+        # Form Đăng nhập
+        with st.form("login_form"):
+            login_username = st.text_input("Tên người dùng")
+            login_password = st.text_input("Mật khẩu", type="password")
+            
+            if st.form_submit_button("Đăng Nhập", type="primary", use_container_width=True):
+                user_check = df_users[
+                    (df_users['Tên người dùng'] == login_username) & 
+                    (df_users['Mật khẩu'] == login_password)
+                ] # Giả định Mật khẩu chưa mã hóa
+                
+                if not user_check.empty:
+                    st.session_state['logged_in_user'] = login_username
+                    st.success("Đăng nhập thành công! Hệ thống đang tải đề xuất...")
+                    st.rerun() # Chuyển sang main_page
+                else:
+                    st.error("Tên người dùng hoặc Mật khẩu không đúng.")
+
+    elif st.session_state['auth_mode'] == 'register':
+        # Hiển thị Form Đăng ký mới
+        draw_registration_form_and_handle(df_movies)
+
+    st.markdown('</div>', unsafe_allow_html=True) # Kết thúc auth-container
+
 
 # ==============================================================================
-# IV. GIAO DIỆN CHÍNH (MAIN PAGE)
+# V. GIAO DIỆN CHÍNH (MAIN PAGE)
 # ==============================================================================
 
 def main_page(df_movies, cosine_sim):
@@ -704,6 +909,7 @@ def main_page(df_movies, cosine_sim):
             
             weight_sim = st.slider("⚖️ Trọng số Độ giống", 0.0, 1.0, 0.7, 0.1)
             
+            # Cập nhật: Dùng st.rerun()
             if st.button("Tìm Đề Xuất", key="find_sim", type="primary"):
                 result = recommend_movies_smart(movie_name, weight_sim, 1-weight_sim, df_movies, cosine_sim)
                 if not result.empty:
@@ -722,7 +928,7 @@ def main_page(df_movies, cosine_sim):
 
         elif menu_choice == 'Đề xuất theo AI':
             # CẬP NHẬT TIÊU ĐỀ
-            st.header("2️⃣ Đề xuất theo AI")
+            st.header("2️⃣ Đề xuất theo AI (Dựa trên Hồ sơ)")
             
             # Logic TỰ ĐỘNG GỌI ĐỀ XUẤT NẾU LÀ ĐĂNG KÝ MỚI
             is_new_registration_with_results = (
@@ -733,8 +939,10 @@ def main_page(df_movies, cosine_sim):
             )
 
             if is_new_registration_with_results:
-                 st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn (Dựa trên Thể loại đã chọn khi đăng ký):")
-            elif st.button("Tìm Đề Xuất AI", key="find_profile", type="primary"):
+                    st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn (Dựa trên Thể loại đã chọn khi đăng ký):")
+            
+            # Cập nhật: Dùng st.rerun()
+            if st.button("Tìm Đề Xuất AI", key="find_profile", type="primary"):
                 recommendations = get_recommendations(username, df_movies)
                 if not recommendations.empty:
                     st.session_state['last_profile_recommendations'] = recommendations
@@ -773,6 +981,7 @@ def main_page(df_movies, cosine_sim):
             st.info(f"Các thể loại trong hồ sơ của bạn: **{recent_genres_display}**")
             st.caption("Bấm nút bên dưới để chạy lại thuật toán đề xuất AI dựa trên các thể loại này.")
 
+            # Cập nhật: Dùng st.rerun()
             if st.button("♻️ Chạy lại Đề xuất AI theo Thể loại này", key="rerun_profile_by_genre", type="primary"):
                 recommendations = get_recommendations(username, df_movies)
                 if not recommendations.empty:
@@ -789,14 +998,25 @@ def main_page(df_movies, cosine_sim):
                 st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI (Theo Thể loại)")
+        
+        elif menu_choice == 'Đăng Xuất':
+            # Chỉ cần gọi hàm logout, không cần hiển thị gì thêm
+            logout()
 
 
 if __name__ == '__main__':
+    # Streamlit Config
+    st.set_page_config(
+        page_title="Movie Recommender AI", 
+        page_icon="🎬", 
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
     df_movies, cosine_sim = load_and_preprocess_static_data()
-    initialize_user_data()
+    df_users = initialize_user_data()
     
     if st.session_state['logged_in_user']:
         main_page(df_movies, cosine_sim)
     else:
-        # Truyền df_movies và cosine_sim vào authentication_page
         authentication_page(df_movies, cosine_sim)
