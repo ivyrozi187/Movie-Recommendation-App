@@ -242,14 +242,13 @@ def logout():
     st.session_state['last_guest_result'] = pd.DataFrame()
     st.session_state['selected_reg_topics'] = set()
     st.session_state['recommended_movie_ids'] = set() # Reset lịch sử
-    st.rerun()
-
+   
 # --- CALLBACK CHO GUEST MODE ---
 def select_topic(topic_key):
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame()
     st.session_state['recommended_movie_ids'] = set() # Reset lịch sử khi đổi topic
-    st.rerun()
+    
 
 # --- CALLBACK CHO ĐĂNG KÝ (MỚI) ---
 def toggle_reg_topic(topic):
@@ -1085,3 +1084,4 @@ if __name__ == '__main__':
         main_page(df_movies, cosine_sim)
     else:
         authentication_page(df_movies, cosine_sim)
+
