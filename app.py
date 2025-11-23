@@ -305,6 +305,57 @@ def inject_pastel_theme():
             color: {TEXT_COLOR};
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }}
+        
+        /* --- CARD CUSTOM STYLES --- */
+        .movie-card {{
+            background-color: #F8F0E3; /* Nền thẻ nhẹ nhàng */
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 100%; /* Đảm bảo chiều cao bằng nhau trong cùng một hàng */
+            transition: all 0.3s ease-in-out;
+            border: 1px solid #EAE7DC;
+        }}
+        .movie-card:hover {{
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.25);
+            transform: translateY(-3px);
+            border-color: {PRIMARY_COLOR};
+        }}
+        .movie-title {{
+            color: {ACCENT_COLOR};
+            font-weight: 800;
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }}
+        .movie-subtitle {{
+            color: #777777;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }}
+        .genre-tag {{
+            display: inline-block;
+            background-color: #A2C3CC; /* Light Blue */
+            color: white;
+            border-radius: 8px;
+            padding: 4px 8px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }}
+        .score-bar {{
+            background-color: #EAE7DC;
+            border-radius: 5px;
+            height: 10px;
+            margin-top: 5px;
+        }}
+        .score-fill {{
+            height: 100%;
+            border-radius: 5px;
+            background-color: {PRIMARY_COLOR};
+            transition: width 1s ease-out;
+        }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -443,7 +494,89 @@ def draw_interest_cards_guest():
 # III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
 # ==============================================================================
 
-# Tạo danh sách màu sắc rực rỡ và dễ phân biệt
+# Hàm MỚI để hiển thị kết quả dưới dạng Card
+def display_movie_cards(df_results, score_col_name, title_suffix):
+    """Hiển thị kết quả đề xuất dưới dạng Card trực quan."""
+    if df_results.empty:
+        st.warning(f"Không có phim nào được đề xuất trong mục {title_suffix}.")
+        return
+
+    st.subheader(f"✅ {len(df_results)} Phim Đề Xuất {title_suffix}:")
+    
+    # Chuẩn hóa điểm số để hiển thị thanh tiến trình (Score Bar)
+    # Tìm cột điểm, nếu là similarity/weighted, chuẩn hóa nó về 0-1
+    if score_col_name == 'Độ phổ biến':
+        # Dùng popularity_norm (đã được chuẩn hóa 0-1 trong tiền xử lý)
+        df_results['display_score_norm'] = df_results['Độ phổ biến'] / 1000 # Giả sử max pop là 1000
+        score_prefix = "Độ phổ biến"
+        score_format = "{:.0f} pts"
+    elif score_col_name in ['weighted_score', 'combined_zero_click_score']:
+        # Tính lại max/min cho tập kết quả hiện tại
+        min_score = df_results[score_col_name].min()
+        max_score = df_results[score_col_name].max()
+        if max_score > min_score:
+            df_results['display_score_norm'] = (df_results[score_col_name] - min_score) / (max_score - min_score)
+        else:
+            df_results['display_score_norm'] = 0.5
+        score_prefix = "Điểm ĐX"
+        score_format = "{:.2f}"
+    elif score_col_name == 'Similarity_Score':
+        max_score = df_results[score_col_name].max()
+        df_results['display_score_norm'] = df_results[score_col_name] / max_score
+        score_prefix = "Giống nhau"
+        score_format = "{:.0f} điểm"
+    else:
+        df_results['display_score_norm'] = 0.5
+        score_prefix = "Điểm"
+        score_format = "{:.2f}"
+
+    
+    cols = st.columns(3) # Hiển thị 3 card mỗi hàng
+    
+    for i, row in df_results.reset_index(drop=True).iterrows():
+        movie_title = row['Tên phim']
+        # Giả sử năm phát hành lấy từ cột "Năm phát hành" (nếu có) hoặc mặc định
+        try:
+            year = int(row.get('Năm phát hành', 2024))
+        except:
+            year = 2024
+
+        genre_list = [g.strip() for g in row['Thể loại phim'].split(',') if g.strip()][:3] # Chỉ lấy 3 genre
+        score_value = row[score_col_name]
+        score_norm = row['display_score_norm']
+        
+        # Tạo HTML cho các thẻ genre
+        genre_tags_html = ""
+        for genre in genre_list:
+            genre_tags_html += f'<span class="genre-tag">{genre}</span>'
+            
+        # Tạo HTML cho thanh tiến trình điểm số (Score Bar)
+        score_bar_html = f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <div style="font-weight: 600; color: {ACCENT_COLOR};">{score_prefix}:</div>
+            <div style="font-weight: 600; color: {PRIMARY_COLOR};">{score_format.format(score_value)}</div>
+        </div>
+        <div class="score-bar">
+            <div class="score-fill" style="width: {score_norm*100:.2f}%;"></div>
+        </div>
+        """
+        
+        card_html = f"""
+        <div class="movie-card">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <span style="font-size: 3rem; color: #B39EB5;">🎬</span> <!-- Icon phim Pastel -->
+            </div>
+            <div class="movie-title">{movie_title}</div>
+            <div class="movie-subtitle">📅 Năm: {year}</div>
+            <div style="margin-bottom: 10px;">{genre_tags_html}</div>
+            {score_bar_html}
+        </div>
+        """
+        
+        with cols[i % 3]:
+            st.markdown(card_html, unsafe_allow_html=True)
+
+
 def get_vibrant_colors(n):
     """Tạo n màu sắc Pastel/Muted (dịu) để phù hợp với theme."""
     cmap = plt.cm.get_cmap('Pastel1', n) # Đổi sang Pastel1
@@ -544,7 +677,8 @@ def get_zero_click_recommendations(df_movies, selected_genres, num_recommendatio
         df['combined_zero_click_score'] = df['base_zero_click_score']
 
     recommended_df = df.sort_values(by='combined_zero_click_score', ascending=False)
-    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'combined_zero_click_score']].head(num_recommendations)
+    # Thêm Năm phát hành để hiển thị trên Card
+    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'combined_zero_click_score', 'Năm phát hành']].head(num_recommendations)
 
 
 def get_recommendations(username, df_movies, num_recommendations=10):
@@ -578,7 +712,8 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     candidate_movies['Similarity_Score'] = candidate_movies['parsed_genres'].apply(lambda x: len(x.intersection(user_genres)))
 
     recommended_df = candidate_movies.sort_values(by=['Similarity_Score', 'Độ phổ biến'], ascending=[False, False])
-    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Similarity_Score']].head(num_recommendations)
+    # Thêm Năm phát hành để hiển thị trên Card
+    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Similarity_Score', 'Năm phát hành']].head(num_recommendations)
 
 def get_movie_index(movie_name, df_movies):
     try:
@@ -600,7 +735,8 @@ def recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine
     df_result['weighted_score'] = (weight_sim * df_result['similarity'] + weight_pop * df_result['popularity_norm'])
     df_result = df_result.drop(df_result[df_result['Tên phim'].str.lower().str.strip() == movie_name.lower().strip()].index)
     df_result = df_result.sort_values(by='weighted_score', ascending=False)
-    return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim']].head(10)
+    # Thêm Năm phát hành để hiển thị trên Card
+    return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim', 'Năm phát hành']].head(10)
 
 
 # ==============================================================================
@@ -733,8 +869,7 @@ def main_page(df_movies, cosine_sim):
                     st.warning("⚠️ Không thể tạo đề xuất.")
             
             if not st.session_state['last_guest_result'].empty:
-                st.subheader("✅ 15 Phim Đề Xuất Phù Hợp:")
-                st.dataframe(st.session_state['last_guest_result'].style.background_gradient(cmap='YlGnBu'), use_container_width=True)
+                display_movie_cards(st.session_state['last_guest_result'], 'combined_zero_click_score', "Zero-Click")
                 
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_guest_plot'], key="plot_guest_check"):
                     plot_recommendation_comparison(st.session_state['last_guest_result'], "Zero-Click")
@@ -785,8 +920,7 @@ def main_page(df_movies, cosine_sim):
                 st.rerun()
 
             if not st.session_state['last_sim_result'].empty:
-                st.subheader(f"🎬 Đề xuất cho '{st.session_state['last_sim_movie']}':")
-                st.dataframe(st.session_state['last_sim_result'].style.background_gradient(cmap='YlOrRd'), use_container_width=True)
+                display_movie_cards(st.session_state['last_sim_result'], 'weighted_score', f"cho '{st.session_state['last_sim_movie']}'")
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_sim_plot'], key="plot_sim_check"):
                     plot_recommendation_comparison(st.session_state['last_sim_result'], "Tên Phim", movie_name=st.session_state['last_sim_movie'])
 
@@ -814,10 +948,7 @@ def main_page(df_movies, cosine_sim):
                 st.rerun()
 
             if not st.session_state['last_profile_recommendations'].empty:
-                st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn:")
-                
-                recommendations = st.session_state['last_profile_recommendations']
-                st.dataframe(recommendations.style.background_gradient(cmap='YlGn'), use_container_width=True)
+                display_movie_cards(st.session_state['last_profile_recommendations'], 'Similarity_Score', "Dành Riêng Cho Bạn")
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI")
 
@@ -854,7 +985,7 @@ def main_page(df_movies, cosine_sim):
             if not st.session_state['last_profile_recommendations'].empty:
                 st.write("---")
                 st.subheader("Kết quả Đề xuất AI gần nhất:")
-                st.dataframe(st.session_state['last_profile_recommendations'].style.background_gradient(cmap='YlGn'), use_container_width=True)
+                display_movie_cards(st.session_state['last_profile_recommendations'], 'Similarity_Score', "Dành Riêng Cho Bạn (Lần gần nhất)")
                 if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI (Theo Thể loại)")
         elif menu_choice == 'Đăng Xuất':
