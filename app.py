@@ -16,6 +16,14 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 # --- CONSTANT ---
 GUEST_USER = "Guest_ZeroClick"
 
+# --- CẤU HÌNH MÀU SẮC TOÀN CỤC ---
+BG_COLOR = "#FFF7F7"       # Nền rất nhạt (Creamy White/Very Light Pink)
+TEXT_COLOR = "#333333"     # Màu chữ đậm
+PRIMARY_COLOR = "#FFAD7F" # Màu cam đào (Peach) - Dùng cho nút chính
+SECONDARY_BG = "#EAE7DC"  # Sidebar và background phụ (Grayish Beige)
+ACCENT_COLOR = "#C06C84"  # Màu nhấn (Muted Rose) - Cho tiêu đề/biểu đồ
+
+
 # --- CẤU HÌNH DANH SÁCH THỂ LOẠI (TOPICS) THEO YÊU CẦU ---
 # Danh sách màu sắc Pastel (Pastel Dream Palette) cho các thẻ
 COLOR_PALETTE = [
@@ -245,12 +253,7 @@ def toggle_reg_topic(topic):
 
 def inject_pastel_theme():
     """Tiêm CSS để tạo giao diện Pastel Theme cho Streamlit."""
-    # Màu sắc chủ đạo Pastel
-    BG_COLOR = "#FFF7F7"       # Nền rất nhạt (Creamy White/Very Light Pink)
-    TEXT_COLOR = "#333333"     # Màu chữ đậm
-    PRIMARY_COLOR = "#FFAD7F" # Màu cam đào (Peach) - Dùng cho nút chính
-    SECONDARY_BG = "#EAE7DC"  # Sidebar và background phụ (Grayish Beige)
-    ACCENT_COLOR = "#C06C84"  # Màu nhấn (Muted Rose) - Cho tiêu đề/biểu đồ
+    # SỬ DỤNG CÁC BIẾN MÀU TOÀN CỤC
     
     st.markdown(f"""
     <style>
@@ -522,7 +525,10 @@ def display_movie_cards(df_results, score_col_name, title_suffix):
         score_format = "{:.2f}"
     elif score_col_name == 'Similarity_Score':
         max_score = df_results[score_col_name].max()
-        df_results['display_score_norm'] = df_results[score_col_name] / max_score
+        if max_score > 0:
+            df_results['display_score_norm'] = df_results[score_col_name] / max_score
+        else:
+            df_results['display_score_norm'] = 0.5
         score_prefix = "Giống nhau"
         score_format = "{:.0f} điểm"
     else:
@@ -869,6 +875,9 @@ def main_page(df_movies, cosine_sim):
                     st.warning("⚠️ Không thể tạo đề xuất.")
             
             if not st.session_state['last_guest_result'].empty:
+                # SỬA LỖI: CỘT 'Năm phát hành' bị thiếu
+                # Cần đảm bảo cột này tồn tại trước khi gọi display_movie_cards
+                # Nó đã được thêm vào get_zero_click_recommendations.
                 display_movie_cards(st.session_state['last_guest_result'], 'combined_zero_click_score', "Zero-Click")
                 
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_guest_plot'], key="plot_guest_check"):
@@ -920,6 +929,7 @@ def main_page(df_movies, cosine_sim):
                 st.rerun()
 
             if not st.session_state['last_sim_result'].empty:
+                # Cần đảm bảo cột 'Năm phát hành' tồn tại. Nó đã được thêm vào recommend_movies_smart.
                 display_movie_cards(st.session_state['last_sim_result'], 'weighted_score', f"cho '{st.session_state['last_sim_movie']}'")
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_sim_plot'], key="plot_sim_check"):
                     plot_recommendation_comparison(st.session_state['last_sim_result'], "Tên Phim", movie_name=st.session_state['last_sim_movie'])
@@ -948,6 +958,7 @@ def main_page(df_movies, cosine_sim):
                 st.rerun()
 
             if not st.session_state['last_profile_recommendations'].empty:
+                # Cần đảm bảo cột 'Năm phát hành' tồn tại. Nó đã được thêm vào get_recommendations.
                 display_movie_cards(st.session_state['last_profile_recommendations'], 'Similarity_Score', "Dành Riêng Cho Bạn")
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI")
@@ -985,6 +996,7 @@ def main_page(df_movies, cosine_sim):
             if not st.session_state['last_profile_recommendations'].empty:
                 st.write("---")
                 st.subheader("Kết quả Đề xuất AI gần nhất:")
+                # Cần đảm bảo cột 'Năm phát hành' tồn tại. Nó đã được thêm vào get_recommendations.
                 display_movie_cards(st.session_state['last_profile_recommendations'], 'Similarity_Score', "Dành Riêng Cho Bạn (Lần gần nhất)")
                 if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI (Theo Thể loại)")
