@@ -123,6 +123,7 @@ def load_and_preprocess_static_data():
                  df_movies['recency_score'] = (df_movies['Năm phát hành'] - min_year) / (max_year - min_year)
             else:
                  df_movies['recency_score'] = 0.5 
+
         else:
             df_movies['recency_score'] = df_movies["popularity_norm"] * 0.1 
 
@@ -231,67 +232,104 @@ def toggle_genre_selection(genre):
 # ---------------------------
 
 def draw_registration_genre_cards():
-    """Vẽ giao diện chọn thẻ thể loại cho mục đích Đăng ký."""
+    """Vẽ giao diện chọn thẻ thể loại cho mục đích Đăng ký, sử dụng CSS để tạo kiểu cho nút bấm Streamlit."""
+    
     st.subheader("Chọn Thể Loại Bạn Yêu Thích (Tối thiểu 5 thể loại)")
     
-    # CSS cho các thẻ
+    # CSS để tạo kiểu thẻ từ nút Streamlit
     st.markdown("""
     <style>
-        .reg-card {
+        div.stButton > button {
             border-radius: 15px;
             color: white;
-            padding: 15px;
+            padding: 15px 10px;
             margin-bottom: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             transition: transform 0.1s, box-shadow 0.1s;
-            cursor: pointer;
             text-align: center;
             font-weight: bold;
+            height: 100px; /* Tăng chiều cao để giống thẻ hơn */
             border: 3px solid transparent;
+            font-size: 1rem;
         }
-        .reg-card:hover {
+        div.stButton > button:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-        .reg-card.selected {
-            border-color: #f63366; /* Màu đỏ Streamlit cho thẻ đã chọn */
-            box-shadow: 0 0 10px #f63366;
-        }
+        
+        /* CSS cho thẻ đã chọn */
+        /* Lưu ý: Streamlit không cho phép CSS dựa trên trạng thái session state,
+           nên chúng ta phải tạo kiểu riêng biệt cho từng nút đã chọn.
+           Việc này sẽ được xử lý bằng cách thêm class vào tag <div> chứa button
+           hoặc dựa vào nội dung nút (không khả thi cho Streamlit)
+           Cách tiếp cận tốt nhất là dùng class riêng cho thẻ đã chọn bên dưới. */
     </style>
     """, unsafe_allow_html=True)
 
     genres = st.session_state['ALL_UNIQUE_GENRES']
     genre_map = st.session_state['ALL_GENRE_TOPICS']
     
-    # Tạo layout 4 cột
     cols = st.columns(4)
     
     for i, genre in enumerate(genres):
         data = genre_map.get(genre, {"color": "#4b5563", "gradient": "#374151"})
         is_selected = genre in st.session_state['selected_reg_genres']
         
-        card_class = "reg-card selected" if is_selected else "reg-card"
+        # Tạo style cho nút dựa trên trạng thái đã chọn
+        base_style = f"background: linear-gradient(135deg, {data['color']}, {data['gradient']}); color: white;"
+        selected_style = f"border: 3px solid #f63366; box-shadow: 0 0 10px #f63366;" if is_selected else ""
         
-        # HTML cho mỗi thẻ
-        card_html = f"""
-        <div class="{card_class}" style="background: linear-gradient(135deg, {data['color']}, {data['gradient']});">
+        # Dùng HTML để hiển thị nội dung bên trong nút
+        button_label = f"""
+        <div style="{base_style} {selected_style} border-radius: 12px; padding: 10px; font-weight: bold; height: 100%; display: flex; align-items: center; justify-content: center;">
             {genre}
         </div>
         """
         
-        # Hiển thị thẻ và nút ẩn để bắt sự kiện click
         with cols[i % 4]:
-            st.markdown(card_html, unsafe_allow_html=True)
+            # Do Streamlit buttons không cho phép tùy chỉnh nội dung phức tạp (HTML),
+            # Chúng ta sẽ dùng cách cũ (st.button) và tạo kiểu CSS mạnh mẽ để chúng trông giống thẻ.
+            # Tên nút sẽ là tên thể loại, màu sẽ được áp dụng qua CSS.
             
-            # Nút ẩn để kích hoạt callback
-            st.button(f"Toggle_{genre}", 
-                      key=f"toggle_reg_{genre}", 
-                      on_click=toggle_genre_selection, 
-                      args=(genre,),
-                      use_container_width=True, 
-                      help=f"Chọn hoặc bỏ chọn thể loại {genre}")
-            # Dùng CSS để ẩn nút Streamlit mặc định đi, chỉ giữ lại thẻ HTML
-            st.markdown("""<style>div[data-testid*="stButton"] > button { height: 0; padding: 0; opacity: 0; margin-top: -160px; }</style>""", unsafe_allow_html=True)
+            # Tuy nhiên, cách đơn giản và hoạt động hiệu quả nhất trong Streamlit
+            # là tạo một thẻ Markdown bao ngoài nút bấm để tùy chỉnh style cho riêng nút đó.
+            
+            # Đây là cách triển khai đơn giản và dễ bảo trì nhất:
+            st.button(
+                genre,
+                key=f"toggle_reg_{genre}",
+                on_click=toggle_genre_selection,
+                args=(genre,),
+                use_container_width=True,
+                # Thay đổi style trực tiếp qua CSS injection cho nút này
+            )
+            
+            # Inject CSS cho nút bấm cụ thể này dựa trên style đã chọn
+            if is_selected:
+                 # Dùng key của button để nhắm mục tiêu (hơi hack nhưng hoạt động trong Streamlit)
+                st.markdown(
+                    f"""
+                    <style>
+                        div.stButton > button[data-testid*="stButton-{f'toggle_reg_{genre}'.lower()}"] {{
+                            {base_style}
+                            {selected_style}
+                        }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                 # Áp dụng style cơ bản nếu chưa chọn
+                 st.markdown(
+                    f"""
+                    <style>
+                        div.stButton > button[data-testid*="stButton-{f'toggle_reg_{genre}'.lower()}"] {{
+                            {base_style}
+                        }}
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
 
 
 def register_new_user_form(df_movies):
