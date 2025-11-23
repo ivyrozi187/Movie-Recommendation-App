@@ -166,7 +166,7 @@ def login_form():
             if username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = username
                 st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
