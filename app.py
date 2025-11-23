@@ -17,6 +17,7 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 GUEST_USER = "Guest_ZeroClick"
 
 # --- CẤU HÌNH MÀU SẮC TOÀN CỤC ---
+# Các biến màu được định nghĩa toàn cục để sử dụng trong CSS tùy chỉnh
 BG_COLOR = "#FFF7F7"       # Nền rất nhạt (Creamy White/Very Light Pink)
 TEXT_COLOR = "#333333"     # Màu chữ đậm
 PRIMARY_COLOR = "#FFAD7F" # Màu cam đào (Peach) - Dùng cho nút chính
@@ -88,6 +89,10 @@ if 'show_guest_plot' not in st.session_state: st.session_state['show_guest_plot'
 # Biến trạng thái mới cho Đăng ký (TOPICS)
 if 'selected_reg_topics' not in st.session_state: st.session_state['selected_reg_topics'] = set()
 
+# BIẾN TRẠNG THÁI MỚI CHO LỊCH SỬ ĐỀ XUẤT (để không lặp lại)
+if 'recommended_movie_ids' not in st.session_state:
+    st.session_state['recommended_movie_ids'] = set()
+
 
 # ==============================================================================
 # I. PHẦN TIỀN XỬ LÝ DỮ LIỆU & HELPERS
@@ -118,7 +123,10 @@ def load_and_preprocess_static_data():
         df_movies = load_data(MOVIE_DATA_FILE)
         df_movies.columns = [col.strip() for col in df_movies.columns]
 
-        # 1. Tiền xử lý cho Content-Based
+        # 1. Thêm cột ID phim duy nhất
+        df_movies['movie_id'] = df_movies.index
+        
+        # 2. Tiền xử lý cho Content-Based
         df_movies["combined_features"] = (
                 df_movies["Đạo diễn"] + " " +
                 df_movies["Diễn viên chính"] + " " +
@@ -136,10 +144,10 @@ def load_and_preprocess_static_data():
         scaler = MinMaxScaler()
         df_movies["popularity_norm"] = scaler.fit_transform(df_movies[["Độ phổ biến"]])
 
-        # 2. Tiền xử lý cho User-Based
+        # 3. Tiền xử lý cho User-Based
         df_movies['parsed_genres'] = df_movies['Thể loại phim'].apply(parse_genres)
 
-        # 3. Tiền xử lý cho Zero-Click
+        # 4. Tiền xử lý cho Zero-Click
         if 'Năm phát hành' in df_movies.columns:
             df_movies['Năm phát hành'] = pd.to_numeric(df_movies['Năm phát hành'], errors='coerce').fillna(pd.Timestamp('now').year)
             max_year = df_movies['Năm phát hành'].max()
@@ -212,6 +220,7 @@ def set_auth_mode(mode):
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_reg_topics'] = set()
+    st.session_state['recommended_movie_ids'] = set() # Reset lịch sử
     st.rerun()
 
 def login_as_guest():
@@ -221,6 +230,7 @@ def login_as_guest():
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_intro_topics'] = []
     st.session_state['last_guest_result'] = pd.DataFrame()
+    st.session_state['recommended_movie_ids'] = set() # Reset lịch sử
     st.rerun()
 
 def logout():
@@ -231,12 +241,14 @@ def logout():
     st.session_state['selected_intro_topics'] = []
     st.session_state['last_guest_result'] = pd.DataFrame()
     st.session_state['selected_reg_topics'] = set()
+    st.session_state['recommended_movie_ids'] = set() # Reset lịch sử
     st.rerun()
 
 # --- CALLBACK CHO GUEST MODE ---
 def select_topic(topic_key):
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame()
+    st.session_state['recommended_movie_ids'] = set() # Reset lịch sử khi đổi topic
     st.rerun()
 
 # --- CALLBACK CHO ĐĂNG KÝ (MỚI) ---
@@ -247,13 +259,36 @@ def toggle_reg_topic(topic):
     else:
         st.session_state['selected_reg_topics'].add(topic)
 
+# --- CALLBACK CHO NÚT TÌM ĐỀ XUẤT AI ---
+def find_profile_recommendations(username, df_movies):
+    """Callback để tìm đề xuất AI mới và cập nhật lịch sử."""
+    # Lấy ID phim đã đề xuất (để không lặp lại)
+    exclude_ids = st.session_state['recommended_movie_ids']
+    
+    # Giới hạn số lượng đề xuất
+    num_recommendations = 10
+    
+    recommendations = get_recommendations(username, df_movies, num_recommendations=num_recommendations, exclude_ids=exclude_ids)
+    
+    if not recommendations.empty:
+        # Lấy ID phim mới
+        new_ids = set(recommendations['movie_id'])
+        
+        # Cập nhật lịch sử và kết quả
+        st.session_state['recommended_movie_ids'].update(new_ids)
+        st.session_state['last_profile_recommendations'] = recommendations
+        st.session_state['show_profile_plot'] = True
+    else:
+        st.warning("Đã hết phim để đề xuất hoặc chưa đủ dữ liệu.")
+    
+    st.rerun()
+
 # ------------------------------------------------------------------------------
 # UI: CÁC HÀM VẼ GIAO DIỆN VÀ CSS (PASTEL THEME)
 # ------------------------------------------------------------------------------
 
 def inject_pastel_theme():
     """Tiêm CSS để tạo giao diện Pastel Theme cho Streamlit."""
-    # SỬ DỤNG CÁC BIẾN MÀU TOÀN CỤC
     
     st.markdown(f"""
     <style>
@@ -683,11 +718,11 @@ def get_zero_click_recommendations(df_movies, selected_genres, num_recommendatio
         df['combined_zero_click_score'] = df['base_zero_click_score']
 
     recommended_df = df.sort_values(by='combined_zero_click_score', ascending=False)
-    # Thêm Năm phát hành để hiển thị trên Card
-    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'combined_zero_click_score', 'Năm phát hành']].head(num_recommendations)
+    # Thêm Năm phát hành và movie_id
+    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'combined_zero_click_score', 'Năm phát hành', 'movie_id']].head(num_recommendations)
 
 
-def get_recommendations(username, df_movies, num_recommendations=10):
+def get_recommendations(username, df_movies, num_recommendations=10, exclude_ids=None):
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
     if user_row.empty: return pd.DataFrame()
@@ -715,11 +750,21 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     if not user_genres: return pd.DataFrame()
 
     candidate_movies = df_movies[df_movies['Tên phim'] != favorite_movie].copy()
+    
+    # ------------------------------------------------------------------------
+    # BƯỚC QUAN TRỌNG: LỌC CÁC PHIM ĐÃ ĐƯỢC ĐỀ XUẤT TRƯỚC ĐÓ (KHÔNG LẶP LẠI)
+    # ------------------------------------------------------------------------
+    if exclude_ids:
+        candidate_movies = candidate_movies[~candidate_movies['movie_id'].isin(exclude_ids)]
+        
+    if candidate_movies.empty:
+        return pd.DataFrame() # Hết phim để đề xuất
+
     candidate_movies['Similarity_Score'] = candidate_movies['parsed_genres'].apply(lambda x: len(x.intersection(user_genres)))
 
     recommended_df = candidate_movies.sort_values(by=['Similarity_Score', 'Độ phổ biến'], ascending=[False, False])
-    # Thêm Năm phát hành để hiển thị trên Card
-    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Similarity_Score', 'Năm phát hành']].head(num_recommendations)
+    # Thêm Năm phát hành và movie_id
+    return recommended_df[['Tên phim', 'Thể loại phim', 'Độ phổ biến', 'Similarity_Score', 'Năm phát hành', 'movie_id']].head(num_recommendations)
 
 def get_movie_index(movie_name, df_movies):
     try:
@@ -741,8 +786,8 @@ def recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine
     df_result['weighted_score'] = (weight_sim * df_result['similarity'] + weight_pop * df_result['popularity_norm'])
     df_result = df_result.drop(df_result[df_result['Tên phim'].str.lower().str.strip() == movie_name.lower().strip()].index)
     df_result = df_result.sort_values(by='weighted_score', ascending=False)
-    # Thêm Năm phát hành để hiển thị trên Card
-    return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim', 'Năm phát hành']].head(10)
+    # Thêm Năm phát hành và movie_id
+    return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim', 'Năm phát hành', 'movie_id']].head(10)
 
 
 # ==============================================================================
@@ -781,10 +826,14 @@ def register_user(username, selected_topics):
     st.session_state['logged_in_user'] = username
     st.session_state['selected_reg_topics'] = set()
     
-    # Tự động chạy đề xuất AI lần đầu để hiển thị ngay
+    # Tự động chạy đề xuất AI lần đầu (LẦN CHẠY ĐẦU TIÊN NÀY CHƯA CÓ LỊCH SỬ)
     df_movies = load_and_preprocess_static_data()[0]
     initial_recommendations = get_recommendations(username, df_movies)
     st.session_state['last_profile_recommendations'] = initial_recommendations
+    
+    # Cập nhật lịch sử đề xuất ban đầu
+    st.session_state['recommended_movie_ids'].update(set(initial_recommendations['movie_id']))
+    
     st.success(f"Đăng ký thành công! Chào mừng {username}. Đang tạo đề xuất ban đầu...")
     st.rerun()
 
@@ -806,6 +855,8 @@ def authentication_page(df_movies, cosine_sim):
             df_users = st.session_state['df_users']
             if login_username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = login_username
+                # Reset lịch sử đề xuất khi đăng nhập user mới
+                st.session_state['recommended_movie_ids'] = set() 
                 st.success(f"Chào mừng trở lại, {login_username}!")
                 st.rerun()
             else:
@@ -875,9 +926,6 @@ def main_page(df_movies, cosine_sim):
                     st.warning("⚠️ Không thể tạo đề xuất.")
             
             if not st.session_state['last_guest_result'].empty:
-                # SỬA LỖI: CỘT 'Năm phát hành' bị thiếu
-                # Cần đảm bảo cột này tồn tại trước khi gọi display_movie_cards
-                # Nó đã được thêm vào get_zero_click_recommendations.
                 display_movie_cards(st.session_state['last_guest_result'], 'combined_zero_click_score', "Zero-Click")
                 
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_guest_plot'], key="plot_guest_check"):
@@ -919,6 +967,8 @@ def main_page(df_movies, cosine_sim):
             weight_sim = st.slider("⚖️ Trọng số Độ giống (Càng cao càng giống nhau về nội dung)", 0.0, 1.0, 0.7, 0.1)
             
             if st.button("Tìm Đề Xuất", key="find_sim", type="primary", use_container_width=True):
+                # Reset lịch sử khi chạy Content-Based (vì đây là đề xuất dựa trên 1 phim cụ thể)
+                st.session_state['recommended_movie_ids'] = set()
                 result = recommend_movies_smart(movie_name, weight_sim, 1-weight_sim, df_movies, cosine_sim)
                 if not result.empty:
                     st.session_state['last_sim_result'] = result
@@ -929,7 +979,6 @@ def main_page(df_movies, cosine_sim):
                 st.rerun()
 
             if not st.session_state['last_sim_result'].empty:
-                # Cần đảm bảo cột 'Năm phát hành' tồn tại. Nó đã được thêm vào recommend_movies_smart.
                 display_movie_cards(st.session_state['last_sim_result'], 'weighted_score', f"cho '{st.session_state['last_sim_movie']}'")
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_sim_plot'], key="plot_sim_check"):
                     plot_recommendation_comparison(st.session_state['last_sim_result'], "Tên Phim", movie_name=st.session_state['last_sim_movie'])
@@ -943,22 +992,27 @@ def main_page(df_movies, cosine_sim):
                 user_row['Phim yêu thích nhất'].iloc[0] == "" and
                 user_row['5 phim coi gần nhất'].iloc[0] != "[]"
             )
-
+            
             if is_new_registration_with_results:
                 st.success(f"Dữ liệu hồ sơ của bạn đã được khởi tạo thành công. Đề xuất ban đầu:")
                 st.info("Các đề xuất này dựa trên các thể loại bạn đã chọn khi đăng ký.")
             
-            if st.button("Tìm Đề Xuất AI", key="find_profile", type="primary", disabled=is_new_registration_with_results, use_container_width=True):
-                recommendations = get_recommendations(username, df_movies)
-                if not recommendations.empty:
-                    st.session_state['last_profile_recommendations'] = recommendations
-                    st.session_state['show_profile_plot'] = True
-                else:
-                    st.warning("Chưa đủ dữ liệu (phim đã xem/thích) để cá nhân hóa đề xuất.")
-                st.rerun()
+            # --- NÚT ĐỀ XUẤT MỚI VỚI CALLBACK ---
+            if st.button(
+                "Tìm Đề Xuất AI", 
+                key="find_profile", 
+                type="primary", 
+                disabled=False, 
+                use_container_width=True,
+                on_click=find_profile_recommendations,
+                args=(username, df_movies)
+            ):
+                pass # Logic được xử lý trong callback
 
             if not st.session_state['last_profile_recommendations'].empty:
-                # Cần đảm bảo cột 'Năm phát hành' tồn tại. Nó đã được thêm vào get_recommendations.
+                # Hiển thị số lượng phim đã được đề xuất
+                st.info(f"Đã đề xuất **{len(st.session_state['recommended_movie_ids'])}** phim. Bấm nút trên để nhận đề xuất mới.")
+
                 display_movie_cards(st.session_state['last_profile_recommendations'], 'Similarity_Score', "Dành Riêng Cho Bạn")
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI")
@@ -984,10 +1038,14 @@ def main_page(df_movies, cosine_sim):
                 return
 
             if st.button("♻️ Chạy lại Đề xuất AI theo Thể loại này", key="rerun_profile_by_genre", type="primary", use_container_width=True):
+                # Reset lịch sử khi chạy lại thủ công
+                st.session_state['recommended_movie_ids'] = set() 
                 recommendations = get_recommendations(username, df_movies)
                 if not recommendations.empty:
                     st.session_state['last_profile_recommendations'] = recommendations
                     st.session_state['show_profile_plot'] = True
+                    # Cập nhật lịch sử
+                    st.session_state['recommended_movie_ids'].update(set(recommendations['movie_id']))
                 else:
                     st.warning("Chưa đủ dữ liệu để đề xuất.")
                 st.rerun()
@@ -996,7 +1054,6 @@ def main_page(df_movies, cosine_sim):
             if not st.session_state['last_profile_recommendations'].empty:
                 st.write("---")
                 st.subheader("Kết quả Đề xuất AI gần nhất:")
-                # Cần đảm bảo cột 'Năm phát hành' tồn tại. Nó đã được thêm vào get_recommendations.
                 display_movie_cards(st.session_state['last_profile_recommendations'], 'Similarity_Score', "Dành Riêng Cho Bạn (Lần gần nhất)")
                 if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
                     plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI (Theo Thể loại)")
