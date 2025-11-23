@@ -16,16 +16,42 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 # --- CONSTANT ---
 GUEST_USER = "Guest_ZeroClick" 
 
-# Bản đồ ánh xạ chủ đề hiển thị (Dùng cho cả Guest mode và Đăng ký mới)
-# Cấu trúc: Tên chủ đề -> {Genres con, Màu sắc, Gradient}
-INTRO_TOPICS = {
-    "Marvel": {"genres": ["Action", "Sci-Fi", "Fantasy"], "color": "#5c67e2", "gradient": "#7983e2"},
-    "4K": {"genres": ["Action", "Adventure", "Sci-Fi"], "color": "#7e8399", "gradient": "#8d90a7"},
-    "Sitcom": {"genres": ["Comedy", "TV Movie"], "color": "#35a371", "gradient": "#42b883"},
-    "Lồng Tiếng Cực Mạnh": {"genres": ["Action", "Adventure", "Drama"], "color": "#9665d9", "gradient": "#a881e6"},
-    "Xuyên Không": {"genres": ["Sci-Fi", "Fantasy", "Adventure"], "color": "#d18c69", "gradient": "#e0a17f"},
-    "Cổ Trang": {"genres": ["History", "War", "Drama"], "color": "#a54545", "gradient": "#b85c5c"},
-}
+# --- CẤU HÌNH DANH SÁCH THỂ LOẠI (TOPICS) THEO YÊU CẦU ---
+# Danh sách màu sắc (Palette hiện đại) để luân phiên cho các thẻ
+COLOR_PALETTE = [
+    ("#e11d48", "#fb7185"), # Rose
+    ("#ea580c", "#fb923c"), # Orange
+    ("#d97706", "#fbbf24"), # Amber
+    ("#65a30d", "#a3e635"), # Lime
+    ("#059669", "#34d399"), # Emerald
+    ("#0891b2", "#22d3ee"), # Cyan
+    ("#2563eb", "#60a5fa"), # Blue
+    ("#4f46e5", "#818cf8"), # Indigo
+    ("#7c3aed", "#a78bfa"), # Violet
+    ("#c026d3", "#e879f9"), # Fuchsia
+    ("#be123c", "#fda4af"), # Pink
+    ("#475569", "#94a3b8"), # Slate
+]
+
+# Danh sách 23 thể loại từ dữ liệu
+GENRES_VI = [
+    "Phim Hành Động", "Phim Giả Tượng", "Phim Hài", "Phim Kinh Dị", 
+    "Phim Phiêu Lưu", "Phim Chính Kịch", "Phim Khoa Học Viễn Tưởng", 
+    "Phim Gây Cấn", "Phim Gia Đình", "Phim Hoạt Hình", "Phim Lãng Mạn", 
+    "Phim Tài Liệu", "Phim Chiến Tranh", "Phim Bí Ẩn", "Phim Hình Sự", 
+    "Phim Viễn Tây", "Phim Cổ Trang", "Phim Nhạc", "Phim Lịch Sử", 
+    "Phim Thần Thoại", "Phim Truyền Hình", "Chương Trình Truyền Hình", "Phim Khác"
+]
+
+# Tạo dictionary ánh xạ tự động
+INTRO_TOPICS = {}
+for i, genre in enumerate(GENRES_VI):
+    color, gradient = COLOR_PALETTE[i % len(COLOR_PALETTE)]
+    INTRO_TOPICS[genre] = {
+        "genres": [genre], # Ánh xạ trực tiếp 1-1
+        "color": color, 
+        "gradient": gradient
+    }
 
 # Lưu các thể loại duy nhất sau khi tiền xử lý
 if 'ALL_UNIQUE_GENRES' not in st.session_state:
@@ -204,10 +230,10 @@ def toggle_reg_topic(topic):
 def draw_registration_topic_cards():
     """Vẽ giao diện chọn chủ đề (Topic) thay vì chọn từng genre lẻ."""
     
-    st.markdown("### Bạn đang quan tâm gì?")
-    st.caption("Chọn các chủ đề bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
+    st.markdown("### Bạn thích thể loại nào?")
+    st.caption("Chọn các thể loại bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
 
-    # CSS cho thẻ Topic (giống hình ảnh)
+    # CSS cho thẻ Topic
     st.markdown("""
     <style>
         div[data-testid*="stButton"] > button {
@@ -217,13 +243,14 @@ def draw_registration_topic_cards():
     """, unsafe_allow_html=True)
 
     topics = list(INTRO_TOPICS.keys())
-    cols = st.columns(3) # Chia lưới 3 cột
+    # Tăng số cột lên 4 để chứa nhiều thể loại hơn cho gọn
+    cols = st.columns(4) 
     
     for i, topic in enumerate(topics):
         data = INTRO_TOPICS[topic]
         is_selected = topic in st.session_state['selected_reg_topics']
         
-        # Style động: Nếu chọn thì có viền sáng/shadow, nếu không thì bình thường
+        # Style động: Nếu chọn thì có viền sáng/shadow
         border_style = "border: 3px solid #f63366; box-shadow: 0 0 15px rgba(246, 51, 102, 0.6);" if is_selected else "border: none;"
         opacity = "1.0" if is_selected else "0.85"
         scale = "transform: scale(1.02);" if is_selected else ""
@@ -232,22 +259,25 @@ def draw_registration_topic_cards():
         btn_style = f"""
             background: linear-gradient(135deg, {data['color']}, {data['gradient']});
             color: white;
-            border-radius: 12px;
-            height: 100px;
+            border-radius: 10px;
+            height: 80px; /* Giảm chiều cao chút cho gọn */
             font-weight: bold;
-            font-size: 1.1rem;
+            font-size: 0.95rem;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             {border_style}
             opacity: {opacity};
             {scale}
             transition: all 0.2s ease-in-out;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
         """
 
-        with cols[i % 3]:
+        with cols[i % 4]:
             # Nút bấm toggle
             st.button(
-                f"{topic}\nXem chủ đề >", 
+                topic, 
                 key=f"reg_topic_{topic}", 
                 on_click=toggle_reg_topic, 
                 args=(topic,),
@@ -260,7 +290,6 @@ def draw_registration_topic_cards():
                     div[data-testid="stButton"] button[key="reg_topic_{topic}"] {{
                         {btn_style}
                     }}
-                    /* Override hover effect */
                     div[data-testid="stButton"] button[key="reg_topic_{topic}"]:hover {{
                         opacity: 1.0;
                         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -283,8 +312,7 @@ def register_new_user_form(df_movies):
 
     st.write("---")
 
-    # 2. Chọn chủ đề (Thay thế phần chọn thể loại và phim yêu thích cũ)
-    # Lưu ý: Không dùng st.form bao quanh phần này để nút bấm tương tác được ngay
+    # 2. Chọn chủ đề
     draw_registration_topic_cards()
     
     selected_topics = list(st.session_state['selected_reg_topics'])
@@ -293,7 +321,7 @@ def register_new_user_form(df_movies):
     if selected_topics:
         st.success(f"✅ Đã chọn: {', '.join(selected_topics)}")
     else:
-        st.warning("Vui lòng chọn ít nhất 1 chủ đề.")
+        st.warning("Vui lòng chọn ít nhất 1 thể loại.")
 
     st.write("---")
 
@@ -308,11 +336,10 @@ def register_new_user_form(df_movies):
             return
         
         if not selected_topics:
-            st.error("❌ Vui lòng chọn ít nhất 1 chủ đề quan tâm.")
+            st.error("❌ Vui lòng chọn ít nhất 1 thể loại.")
             return
         
         # --- LOGIC MỚI: CHUYỂN ĐỔI TOPIC -> GENRES ---
-        # Lấy tất cả genres từ các topic đã chọn để lưu vào hồ sơ
         mapped_genres = set()
         for topic in selected_topics:
             if topic in INTRO_TOPICS:
@@ -328,9 +355,7 @@ def register_new_user_form(df_movies):
         new_user_data = {
             'ID': [new_id],
             'Tên người dùng': [username],
-            # Lưu danh sách genres đã convert từ topics vào cột này
             '5 phim coi gần nhất': [str(final_genres_list)], 
-            # Bỏ chọn phim yêu thích, lưu giá trị mặc định hoặc rỗng
             'Phim yêu thích nhất': [""] 
         }
         new_user_df = pd.DataFrame(new_user_data)
@@ -549,22 +574,26 @@ def draw_interest_cards_guest():
     """, unsafe_allow_html=True)
 
     topics = list(INTRO_TOPICS.keys())
-    cols = st.columns(3)
+    # Tăng số cột lên 4 cho gọn
+    cols = st.columns(4)
     
     for i, topic in enumerate(topics):
         data = INTRO_TOPICS[topic]
         btn_style = f"""
             background: linear-gradient(135deg, {data['color']}, {data['gradient']});
             color: white;
-            border-radius: 12px;
-            height: 120px;
+            border-radius: 10px;
+            height: 100px;
             font-weight: bold;
-            font-size: 1.2rem;
+            font-size: 0.95rem;
             width: 100%;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         """
-        with cols[i % 3]:
-            st.button(f"{topic}\nXem chủ đề >", key=f"guest_{topic}", on_click=select_topic, args=(topic,), use_container_width=True)
+        with cols[i % 4]:
+            st.button(topic, key=f"guest_{topic}", on_click=select_topic, args=(topic,), use_container_width=True)
             st.markdown(f"""<style>div[data-testid="stButton"] button[key="guest_{topic}"] {{ {btn_style} }}</style>""", unsafe_allow_html=True)
 
 def main_page(df_movies, cosine_sim):
