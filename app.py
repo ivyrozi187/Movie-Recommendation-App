@@ -214,7 +214,7 @@ def login_as_guest():
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_intro_topics'] = [] 
     st.session_state['last_guest_result'] = pd.DataFrame() 
-    
+    st.rerun()
 
 def logout():
     st.session_state['logged_in_user'] = None
@@ -229,7 +229,7 @@ def logout():
 def select_topic(topic_key):
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame()
-    
+    st.rerun()
 
 # --- CALLBACK CHO ĐĂNG KÝ (MỚI) ---
 def toggle_reg_topic(topic):
@@ -248,11 +248,14 @@ def draw_registration_topic_cards():
     st.markdown("### Bạn thích thể loại nào?")
     st.caption("Chọn các thể loại bạn thích để chúng tôi xây dựng hồ sơ ban đầu:")
 
-    # CSS cho thẻ Topic
+    # CSS chung cho nút Streamlit, đặc biệt là nút trong cột
     st.markdown("""
     <style>
+        /* Đảm bảo nút trong giao diện chọn thể loại có nền gradient và không bị ảnh hưởng bởi style Streamlit mặc định */
         div[data-testid*="stButton"] > button {
              border: none; 
+             /* Đặt transition cho các hiệu ứng CSS */
+             transition: all 0.2s ease-in-out;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -266,27 +269,33 @@ def draw_registration_topic_cards():
         is_selected = topic in st.session_state['selected_reg_topics']
         
         # Style động: Nếu chọn thì có viền sáng/shadow
-        border_style = "border: 3px solid #f63366; box-shadow: 0 0 15px rgba(246, 51, 102, 0.6);" if is_selected else "border: none;"
-        opacity = "1.0" if is_selected else "0.85"
-        scale = "transform: scale(1.02);" if is_selected else ""
+        # Thay đổi box-shadow để trông tinh tế hơn khi được chọn
+        border_style = "border: 3px solid #f63366;" if is_selected else "border: none;"
+        selected_shadow = "box-shadow: 0 0 18px rgba(246, 51, 102, 0.7);" if is_selected else "box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);"
+        opacity = "1.0" if is_selected else "0.9"
         
         # Tạo style riêng cho từng nút
         btn_style = f"""
+            /* Base style - sử dụng gradient */
             background: linear-gradient(135deg, {data['color']}, {data['gradient']});
             color: white;
             border-radius: 10px;
-            height: 80px; /* Giảm chiều cao chút cho gọn */
+            height: 80px; 
             font-weight: bold;
             font-size: 0.95rem;
             width: 100%;
             margin-bottom: 8px;
+            
             {border_style}
+            {selected_shadow}
             opacity: {opacity};
-            {scale}
-            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            
+            /* Dùng flexbox để căn giữa chữ */
             display: flex; 
             align-items: center; 
             justify-content: center;
+            transition: all 0.2s ease-in-out;
         """
 
         with cols[i % 4]:
@@ -299,16 +308,27 @@ def draw_registration_topic_cards():
                 use_container_width=True
             )
             
-            # Inject CSS vào nút vừa tạo
+            # Inject CSS chi tiết vào nút vừa tạo, bao gồm hover và active states
             st.markdown(f"""
                 <style>
+                    /* Style cơ bản (áp dụng cho cả trạng thái đã chọn) */
                     div[data-testid="stButton"] button[key="reg_topic_{topic}"] {{
                         {btn_style}
                     }}
+                    /* Hiệu ứng HOVER: Sáng hơn (115%), nâng nhẹ (1.03), bóng sâu hơn */
                     div[data-testid="stButton"] button[key="reg_topic_{topic}"]:hover {{
+                        filter: brightness(115%);
+                        transform: scale(1.03);
+                        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+                        border-color: #f63366 !important; /* Luôn có viền màu nổi bật khi hover */
                         opacity: 1.0;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                        {border_style}
+                        color: white;
+                    }}
+                    /* Hiệu ứng ACTIVE/CLICK: nhấn chìm */
+                    div[data-testid="stButton"] button[key="reg_topic_{topic}"]:active {{
+                        transform: scale(0.98);
+                        filter: brightness(90%);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
                         color: white;
                     }}
                 </style>
@@ -489,7 +509,6 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     user_genres = set(user_genres_list)
     
     # Lấy phim yêu thích (nếu có) để boost thêm
-    # Đã an toàn vì initialize_user_data đảm bảo cột này tồn tại
     favorite_movie = user_row['Phim yêu thích nhất'].iloc[0]
     if favorite_movie:
         favorite_movie_genres = df_movies[df_movies['Tên phim'] == favorite_movie]['parsed_genres'].iloc[0] if not df_movies[df_movies['Tên phim'] == favorite_movie].empty else set()
@@ -593,18 +612,16 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
 # ==============================================================================
 
 def draw_interest_cards_guest():
-    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1."""
+    """Giao diện thẻ cho chế độ Khách (Guest) - Chỉ chọn 1. Đã áp dụng CSS mới."""
     st.header("Bạn đang quan tâm gì?")
     st.markdown("Chọn một chủ đề để nhận đề xuất ngay:")
     
     st.markdown("""
     <style>
-        div[data-testid="stButton"] button {
+        /* Đặt style chung cho tất cả các nút card */
+        div[data-testid*="stButton"] button {
             border: none;
-            transition: transform 0.2s;
-        }
-        div[data-testid="stButton"] button:hover {
-            transform: scale(1.05);
+            transition: all 0.2s ease-in-out;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -616,6 +633,7 @@ def draw_interest_cards_guest():
     for i, topic in enumerate(topics):
         data = INTRO_TOPICS[topic]
         btn_style = f"""
+            /* Base style - sử dụng gradient */
             background: linear-gradient(135deg, {data['color']}, {data['gradient']});
             color: white;
             border-radius: 10px;
@@ -627,10 +645,32 @@ def draw_interest_cards_guest():
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease-in-out;
         """
         with cols[i % 4]:
             st.button(topic, key=f"guest_{topic}", on_click=select_topic, args=(topic,), use_container_width=True)
-            st.markdown(f"""<style>div[data-testid="stButton"] button[key="guest_{topic}"] {{ {btn_style} }}</style>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <style>
+                    div[data-testid="stButton"] button[key="guest_{topic}"] {{ 
+                        {btn_style} 
+                    }}
+                    /* Hiệu ứng HOVER: Sáng hơn (115%), nâng nhẹ (1.03), bóng sâu hơn */
+                    div[data-testid="stButton"] button[key="guest_{topic}"]:hover {{
+                        filter: brightness(115%);
+                        transform: scale(1.03);
+                        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+                        color: white;
+                    }}
+                    /* Hiệu ứng ACTIVE/CLICK: nhấn chìm */
+                    div[data-testid="stButton"] button[key="guest_{topic}"]:active {{
+                        transform: scale(0.98);
+                        filter: brightness(90%);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                        color: white;
+                    }}
+                </style>
+            """, unsafe_allow_html=True)
 
 def main_page(df_movies, cosine_sim):
     is_guest = st.session_state['logged_in_user'] == GUEST_USER
@@ -802,4 +842,3 @@ if __name__ == '__main__':
     else:
         # Truyền df_movies và cosine_sim vào authentication_page
         authentication_page(df_movies, cosine_sim)
-
