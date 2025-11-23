@@ -20,6 +20,14 @@ if 'logged_in_user' not in st.session_state:
     st.session_state['logged_in_user'] = None
 if 'auth_mode' not in st.session_state:
     st.session_state['auth_mode'] = 'login'
+# Khởi tạo các biến để lưu kết quả và trạng thái hiển thị biểu đồ
+if 'last_sim_result' not in st.session_state: st.session_state['last_sim_result'] = pd.DataFrame()
+if 'last_sim_movie' not in st.session_state: st.session_state['last_sim_movie'] = None
+if 'show_sim_plot' not in st.session_state: st.session_state['show_sim_plot'] = False
+
+if 'last_profile_recommendations' not in st.session_state: st.session_state['last_profile_recommendations'] = pd.DataFrame()
+if 'show_profile_plot' not in st.session_state: st.session_state['show_profile_plot'] = False
+
 
 # ==============================================================================
 # I. PHẦN TIỀN XỬ LÝ DỮ LIỆU & HELPERS
@@ -102,6 +110,25 @@ def get_unique_movie_titles(df_movies):
 # ==============================================================================
 # II. CHỨC NĂNG ĐĂNG KÝ / ĐĂNG NHẬP
 # ==============================================================================
+
+# --- CALLBACK FUNCTIONS ---
+def set_auth_mode(mode):
+    """Hàm callback để chuyển đổi giữa Đăng nhập và Đăng ký."""
+    st.session_state['auth_mode'] = mode
+    # Reset các kết quả đề xuất khi chuyển trang
+    st.session_state['last_sim_result'] = pd.DataFrame()
+    st.session_state['last_profile_recommendations'] = pd.DataFrame()
+    st.rerun()
+
+def logout():
+    """Hàm callback để Đăng xuất."""
+    st.session_state['logged_in_user'] = None
+    st.session_state['auth_mode'] = 'login'
+    # Reset các kết quả đề xuất khi đăng xuất
+    st.session_state['last_sim_result'] = pd.DataFrame()
+    st.session_state['last_profile_recommendations'] = pd.DataFrame()
+    st.rerun()
+# ---------------------------
 
 def register_new_user_form(df_movies):
     """Form đăng ký người dùng mới (Lưu vào bộ nhớ Streamlit)."""
@@ -191,11 +218,11 @@ def authentication_page(df_movies):
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("Đăng Nhập", key="btn_login"):
-            st.session_state['auth_mode'] = 'login'
+        # SỬ DỤNG on_click
+        st.button("Đăng Nhập", key="btn_login", on_click=set_auth_mode, args=('login',))
     with col2:
-        if st.button("Đăng Ký", key="btn_register"):
-            st.session_state['auth_mode'] = 'register'
+        # SỬ DỤNG on_click
+        st.button("Đăng Ký", key="btn_register", on_click=set_auth_mode, args=('register',))
 
     if st.session_state['auth_mode'] == 'login':
         login_form()
@@ -241,8 +268,6 @@ def get_recommendations(username, df_movies, num_recommendations=10):
         user_genres.update(genres)
 
     if not user_genres: 
-        # Cảnh báo này có thể hữu ích khi debug
-        # st.warning(f"Không tìm thấy thể loại nào từ phim đã xem của người dùng {username}.")
         return pd.DataFrame()
 
     # Loại trừ các phim đã xem/yêu thích
@@ -389,10 +414,9 @@ def main_page(df_movies, cosine_sim):
         ('Đề xuất theo Tên Phim', 'Đề xuất theo Hồ Sơ', 'Đăng Xuất')
     )
 
-    if st.sidebar.button("Đăng Xuất", key="logout_btn"):
-        st.session_state['logged_in_user'] = None
-        st.session_state['auth_mode'] = 'login'
-        st.rerun() 
+    # SỬ DỤNG on_click cho nút ĐĂNG XUẤT
+    if st.sidebar.button("Đăng Xuất", key="logout_btn", on_click=logout):
+        pass # Logic đã chuyển sang hàm logout()
         
     st.sidebar.write("-" * 20)
 
@@ -400,7 +424,10 @@ def main_page(df_movies, cosine_sim):
         st.header("1️⃣ Đề xuất dựa trên Nội dung (TF-IDF)")
         
         movie_titles_list = get_unique_movie_titles(df_movies)
-        movie_name = st.selectbox("🎥 Chọn tên phim bạn yêu thích:", options=movie_titles_list)
+        
+        # Gán giá trị mặc định cho selectbox từ kết quả lần trước (nếu có)
+        default_movie_name = st.session_state['last_sim_movie'] if st.session_state['last_sim_movie'] in movie_titles_list else movie_titles_list[0]
+        movie_name = st.selectbox("🎥 Chọn tên phim bạn yêu thích:", options=movie_titles_list, index=movie_titles_list.index(default_movie_name))
         
         weight_sim = st.slider("⚖️ Trọng số Độ giống (Similarity)", 0.0, 1.0, 0.7, 0.1)
         weight_pop = 1 - weight_sim
@@ -409,15 +436,33 @@ def main_page(df_movies, cosine_sim):
             result = recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine_sim)
             
             if not result.empty:
-                st.subheader(f"🎬 10 Đề xuất phim dựa trên '{movie_name}':")
-                st.dataframe(result, use_container_width=True)
-
-                if st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại"):
-                    # Lấy dataframe đầy đủ thông tin cho các phim được đề xuất
-                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(result['Tên phim'].tolist())]
-                    plot_genre_popularity(movie_name, recommended_movies_info, df_movies, is_user_based=False)
+                # LƯU KẾT QUẢ VÀ TRẠNG THÁI VÀO SESSION STATE
+                st.session_state['last_sim_result'] = result
+                st.session_state['last_sim_movie'] = movie_name
+                st.session_state['show_sim_plot'] = True # Tự động hiển thị biểu đồ
             else:
+                # XÓA KẾT QUẢ CŨ VÀ ĐẶT LẠI TRẠNG THÁI KHI KHÔNG TÌM THẤY
+                st.session_state['last_sim_result'] = pd.DataFrame()
+                st.session_state['show_sim_plot'] = False
                 st.warning("⚠️ Không tìm thấy đề xuất hoặc phim gốc không tồn tại.")
+            st.rerun() # Chạy lại để hiển thị kết quả
+
+        # --- HIỂN THỊ KẾT QUẢ VÀ BIỂU ĐỒ (ngoài khối if button) ---
+        if not st.session_state['last_sim_result'].empty:
+            result = st.session_state['last_sim_result']
+            movie_name_for_display = st.session_state['last_sim_movie']
+
+            st.subheader(f"🎬 10 Đề xuất phim dựa trên '{movie_name_for_display}':")
+            st.dataframe(result, use_container_width=True)
+
+            # Checkbox có giá trị mặc định được lưu trong Session State
+            show_plot = st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", 
+                                    value=st.session_state['show_sim_plot'], 
+                                    key="plot_sim_check")
+
+            if show_plot:
+                recommended_movies_info = df_movies[df_movies['Tên phim'].isin(result['Tên phim'].tolist())]
+                plot_genre_popularity(movie_name_for_display, recommended_movies_info, df_movies, is_user_based=False)
 
     elif menu_choice == 'Đề xuất theo Hồ Sơ':
         st.header("2️⃣ Đề xuất dựa trên Hồ sơ Người dùng")
@@ -431,7 +476,6 @@ def main_page(df_movies, cosine_sim):
 
         # Hiển thị 5 phim đã xem gần nhất
         recent_films_str = user_row['5 phim coi gần nhất'].iloc[0]
-        # Xử lý chuỗi để hiển thị đẹp hơn
         recent_films = []
         try:
             recent_films = ast.literal_eval(recent_films_str)
@@ -447,17 +491,33 @@ def main_page(df_movies, cosine_sim):
             recommendations = get_recommendations(username, df_movies, num_recommendations=10)
 
             if not recommendations.empty:
-                st.subheader(f"✅ 10 Đề xuất Phim Dành Cho Bạn:")
-                st.dataframe(recommendations, use_container_width=True)
-                
-                if st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", key="plot_profile_check"):
-                    # Lấy dataframe đầy đủ thông tin cho các phim được đề xuất
-                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(recommendations['Tên phim'].tolist())]
-                    plot_genre_popularity(None, 
-                                          recommended_movies_info, 
-                                          df_movies, is_user_based=True)
+                # LƯU KẾT QUẢ VÀ TRẠNG THÁI VÀO SESSION STATE
+                st.session_state['last_profile_recommendations'] = recommendations
+                st.session_state['show_profile_plot'] = True # Tự động hiển thị biểu đồ
             else:
+                # XÓA KẾT QUẢ CŨ VÀ ĐẶT LẠI TRẠNG THÁI KHI KHÔNG TÌM THẤY
+                st.session_state['last_profile_recommendations'] = pd.DataFrame()
+                st.session_state['show_profile_plot'] = False
                 st.warning("⚠️ Không có đề xuất nào được tạo. Kiểm tra dữ liệu thể loại phim đã xem.")
+            st.rerun() # Chạy lại để hiển thị kết quả
+
+        # --- HIỂN THỊ KẾT QUẢ VÀ BIỂU ĐỒ (ngoài khối if button) ---
+        if not st.session_state['last_profile_recommendations'].empty:
+            recommendations = st.session_state['last_profile_recommendations']
+
+            st.subheader(f"✅ 10 Đề xuất Phim Dành Cho Bạn:")
+            st.dataframe(recommendations, use_container_width=True)
+            
+            # Checkbox có giá trị mặc định được lưu trong Session State
+            show_plot_profile = st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", 
+                                            value=st.session_state['show_profile_plot'],
+                                            key="plot_profile_check")
+            
+            if show_plot_profile:
+                recommended_movies_info = df_movies[df_movies['Tên phim'].isin(recommendations['Tên phim'].tolist())]
+                plot_genre_popularity(None, 
+                                      recommended_movies_info, 
+                                      df_movies, is_user_based=True)
 
 
 # ==============================================================================
