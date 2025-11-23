@@ -19,19 +19,20 @@ GUEST_USER = "Guest_ZeroClick"
 
 # --- CẤU HÌNH DANH SÁCH THỂ LOẠI (TOPICS) THEO YÊU CẦU ---
 # Danh sách màu sắc (Palette hiện đại) để luân phiên cho các thẻ
+# Đã thêm màu HOVER thứ 3 để tạo hiệu ứng đổi màu rõ rệt
 COLOR_PALETTE = [
-    ("#e11d48", "#fb7185"), # Rose
-    ("#ea580c", "#fb923c"), # Orange
-    ("#d97706", "#fbbf24"), # Amber
-    ("#65a30d", "#a3e635"), # Lime
-    ("#059669", "#34d399"), # Emerald
-    ("#0891b2", "#22d3ee"), # Cyan
-    ("#2563eb", "#60a5fa"), # Blue
-    ("#4f46e5", "#818cf8"), # Indigo
-    ("#7c3aed", "#a78bfa"), # Violet
-    ("#c026d3", "#e879f9"), # Fuchsia
-    ("#be123c", "#fda4af"), # Pink
-    ("#475569", "#94a3b8"), # Slate
+    ("#e11d48", "#fb7185", "#be123c"), # Rose -> Darker Rose
+    ("#ea580c", "#fb923c", "#c2410c"), # Orange -> Darker Orange
+    ("#d97706", "#fbbf24", "#b45309"), # Amber -> Darker Amber
+    ("#65a30d", "#a3e635", "#4d7c0f"), # Lime -> Darker Lime
+    ("#059669", "#34d399", "#065f46"), # Emerald -> Darker Emerald
+    ("#0891b2", "#22d3ee", "#0e7490"), # Cyan -> Darker Cyan
+    ("#2563eb", "#60a5fa", "#1d4ed8"), # Blue -> Darker Blue
+    ("#4f46e5", "#818cf8", "#4338ca"), # Indigo -> Darker Indigo
+    ("#7c3aed", "#a78bfa", "#6d28d9"), # Violet -> Darker Violet
+    ("#c026d3", "#e879f9", "#a21caf"), # Fuchsia -> Darker Fuchsia
+    ("#be123c", "#fda4af", "#9f1239"), # Pink -> Darker Pink
+    ("#475569", "#94a3b8", "#334155"), # Slate -> Darker Slate
 ]
 
 # Danh sách 23 thể loại từ dữ liệu
@@ -47,11 +48,12 @@ GENRES_VI = [
 # Tạo dictionary ánh xạ tự động
 INTRO_TOPICS = {}
 for i, genre in enumerate(GENRES_VI):
-    color, gradient = COLOR_PALETTE[i % len(COLOR_PALETTE)]
+    color, gradient, hover_color = COLOR_PALETTE[i % len(COLOR_PALETTE)]
     INTRO_TOPICS[genre] = {
         "genres": [genre], # Ánh xạ trực tiếp 1-1
         "color": color, 
-        "gradient": gradient
+        "gradient": gradient,
+        "hover_color": hover_color # Thêm màu hover
     }
 
 # Lưu các thể loại duy nhất sau khi tiền xử lý
@@ -270,7 +272,6 @@ def draw_registration_topic_cards():
         is_selected = topic in st.session_state['selected_reg_topics']
         
         # Style động: Nếu chọn thì có viền sáng/shadow
-        # Thay đổi box-shadow để trông tinh tế hơn khi được chọn
         border_style = "border: 3px solid #f63366;" if is_selected else "border: none;"
         selected_shadow = "box-shadow: 0 0 18px rgba(246, 51, 102, 0.7);" if is_selected else "box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);"
         opacity = "1.0" if is_selected else "0.9"
@@ -298,6 +299,19 @@ def draw_registration_topic_cards():
             justify-content: center;
             transition: all 0.2s ease-in-out;
         """
+        
+        # --- STYLE CHO HOVER MỚI ---
+        hover_style = f"""
+            /* Hiệu ứng HOVER: Đổi sang màu solid/gradient khác */
+            div[data-testid="stButton"] button[key="reg_topic_{topic}"]:hover {{
+                background: {data['hover_color']}; /* Đổi màu nền khi hover */
+                transform: scale(1.03);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+                border-color: #f63366 !important;
+                opacity: 1.0;
+                color: white;
+            }}
+        """
 
         with cols[i % 4]:
             # Nút bấm toggle
@@ -316,15 +330,7 @@ def draw_registration_topic_cards():
                     div[data-testid="stButton"] button[key="reg_topic_{topic}"] {{
                         {btn_style}
                     }}
-                    /* Hiệu ứng HOVER: Sáng hơn (115%), nâng nhẹ (1.03), bóng sâu hơn */
-                    div[data-testid="stButton"] button[key="reg_topic_{topic}"]:hover {{
-                        filter: brightness(115%);
-                        transform: scale(1.03);
-                        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-                        border-color: #f63366 !important; /* Luôn có viền màu nổi bật khi hover */
-                        opacity: 1.0;
-                        color: white;
-                    }}
+                    {hover_style}
                     /* Hiệu ứng ACTIVE/CLICK: nhấn chìm */
                     div[data-testid="stButton"] button[key="reg_topic_{topic}"]:active {{
                         transform: scale(0.98);
@@ -659,6 +665,18 @@ def draw_interest_cards_guest():
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             transition: all 0.2s ease-in-out;
         """
+        
+        # --- STYLE CHO HOVER MỚI ---
+        hover_style = f"""
+            /* Hiệu ứng HOVER: Đổi sang màu solid/gradient khác */
+            div[data-testid="stButton"] button[key="guest_{topic}"]:hover {{
+                background: {data['hover_color']}; /* Đổi màu nền khi hover */
+                transform: scale(1.03);
+                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+                color: white;
+            }}
+        """
+
         with cols[i % 4]:
             st.button(topic, key=f"guest_{topic}", on_click=select_topic, args=(topic,), use_container_width=True)
             st.markdown(f"""
@@ -666,13 +684,7 @@ def draw_interest_cards_guest():
                     div[data-testid="stButton"] button[key="guest_{topic}"] {{ 
                         {btn_style} 
                     }}
-                    /* Hiệu ứng HOVER: Sáng hơn (115%), nâng nhẹ (1.03), bóng sâu hơn */
-                    div[data-testid="stButton"] button[key="guest_{topic}"]:hover {{
-                        filter: brightness(115%);
-                        transform: scale(1.03);
-                        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-                        color: white;
-                    }}
+                    {hover_style}
                     /* Hiệu ứng ACTIVE/CLICK: nhấn chìm */
                     div[data-testid="stButton"] button[key="guest_{topic}"]:active {{
                         transform: scale(0.98);
