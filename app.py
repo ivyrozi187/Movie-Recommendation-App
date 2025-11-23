@@ -221,7 +221,7 @@ def set_auth_mode(mode):
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_reg_topics'] = set()
     st.session_state['recommended_movie_ids'] = set() # Reset lịch sử
-    st.rerun()
+    
 
 def login_as_guest():
     st.session_state['logged_in_user'] = GUEST_USER
@@ -231,7 +231,7 @@ def login_as_guest():
     st.session_state['selected_intro_topics'] = []
     st.session_state['last_guest_result'] = pd.DataFrame()
     st.session_state['recommended_movie_ids'] = set() # Reset lịch sử
-    st.rerun()
+    
 
 def logout():
     st.session_state['logged_in_user'] = None
@@ -1072,3 +1072,4 @@ if __name__ == '__main__':
         main_page(df_movies, cosine_sim)
     else:
         authentication_page(df_movies, cosine_sim)
+
