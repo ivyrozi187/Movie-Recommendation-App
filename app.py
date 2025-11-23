@@ -34,7 +34,7 @@ if 'ALL_UNIQUE_GENRES' not in st.session_state:
 if 'ALL_GENRE_TOPICS' not in st.session_state:
     st.session_state['ALL_GENRE_TOPICS'] = {}
 
-# --- KHỞI TẠO BIẾN TRẠNG THÁT (SESSION STATE) ---
+# --- KHỞI TẠO BIẾN TRẠNG THÁI (SESSION STATE) ---
 if 'logged_in_user' not in st.session_state:
     st.session_state['logged_in_user'] = None
 if 'auth_mode' not in st.session_state:
@@ -206,7 +206,7 @@ def login_as_guest():
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_intro_topics'] = [] # Reset topic selection
     st.session_state['last_guest_result'] = pd.DataFrame() # Reset results
-    st.rerun() # Chạy lại để chuyển sang main_page
+    st.rerun() # <-- Đã cập nhật thành st.rerun()
 
 def logout():
     """Hàm callback để Đăng xuất."""
@@ -222,7 +222,7 @@ def select_topic(topic_key):
     """Lưu chủ đề đã chọn và kích hoạt tìm kiếm."""
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame() # Xóa kết quả cũ
-    st.rerun()
+    st.rerun() # <-- Đã cập nhật thành st.rerun()
 
 # Hàm callback khi bấm vào thẻ thể loại (Registration Mode)
 def toggle_genre_selection(genre):
@@ -239,7 +239,6 @@ def draw_registration_genre_cards():
     st.subheader("Chọn Thể Loại Bạn Yêu Thích (Tối thiểu 5 thể loại)")
     
     # CSS TẠO KIỂU CHUNG CHO NÚT (KHÔNG BỊ RÒ RỈ VÀO CÁC NÚT ĐĂNG NHẬP/ĐĂNG KÝ)
-    # Chúng ta phải nhắm mục tiêu chính xác hơn để tránh ảnh hưởng đến các nút khác
     st.markdown("""
     <style>
         /* Tạo kiểu cơ bản cho nút, đây là giao diện thẻ chung */
@@ -258,7 +257,6 @@ def draw_registration_genre_cards():
             cursor: pointer;
         }
         /* Style cho nút Đăng ký/Đăng nhập ở trang đầu để chúng không bị ảnh hưởng */
-        /* Chỉ áp dụng style cho nút trong cột (tránh nút sidebar) */
         div[data-testid*="stHorizontalBlock"] > div.stButton > button {
              border-radius: 8px;
              height: 50px;
@@ -297,7 +295,6 @@ def draw_registration_genre_cards():
             )
             
             # Inject CSS cho nút bấm cụ thể này dựa trên style đã chọn và màu gradient
-            # Việc này phải sử dụng data-testid để nhắm mục tiêu chính xác
             st.markdown(
                 f"""
                 <style>
@@ -369,7 +366,7 @@ def register_new_user_form(df_movies):
             
             st.session_state['logged_in_user'] = username
             st.success(f"🎉 Đăng ký và đăng nhập thành công! Chào mừng, {username}.")
-            st.rerun() 
+            st.rerun() # <-- Đã cập nhật thành st.rerun()
 
 def login_form():
     """Form đăng nhập."""
@@ -385,7 +382,7 @@ def login_form():
             if username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = username
                 st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.rerun() 
+                st.rerun() # <-- Đã cập nhật thành st.rerun()
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
@@ -755,8 +752,8 @@ def main_page(df_movies, cosine_sim):
                 st.dataframe(zero_click_results, use_container_width=True)
                 
                 show_plot_guest = st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", 
-                                                value=st.session_state['show_guest_plot'],
-                                                key="plot_guest_check")
+                                              value=st.session_state['show_guest_plot'],
+                                              key="plot_guest_check")
                 
                 if show_plot_guest:
                     recommended_movies_info = df_movies[df_movies['Tên phim'].isin(zero_click_results['Tên phim'].tolist())]
@@ -802,7 +799,7 @@ def main_page(df_movies, cosine_sim):
                     st.session_state['last_sim_result'] = pd.DataFrame()
                     st.session_state['show_sim_plot'] = False
                     st.warning("⚠️ Không tìm thấy đề xuất hoặc phim gốc không tồn tại.")
-                st.rerun() 
+                st.rerun() # <-- Đã cập nhật thành st.rerun()
 
             if not st.session_state['last_sim_result'].empty:
                 result = st.session_state['last_sim_result']
@@ -851,7 +848,7 @@ def main_page(df_movies, cosine_sim):
                     st.session_state['last_profile_recommendations'] = pd.DataFrame()
                     st.session_state['show_profile_plot'] = False
                     st.warning("⚠️ Không có đề xuất nào được tạo. Kiểm tra dữ liệu thể loại phim đã xem.")
-                st.rerun() 
+                st.rerun() # <-- Đã cập nhật thành st.rerun()
 
             if not st.session_state['last_profile_recommendations'].empty:
                 recommendations = st.session_state['last_profile_recommendations']
