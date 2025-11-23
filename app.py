@@ -620,6 +620,7 @@ def main_page(df_movies, cosine_sim):
     st.sidebar.title("Menu Đề Xuất")
     
     if is_guest:
+        # Giữ nguyên logic Guest Mode
         st.header("🔥 Đề xuất Zero-Click")
         if not st.session_state['selected_intro_topics']:
             draw_interest_cards_guest()
@@ -652,13 +653,20 @@ def main_page(df_movies, cosine_sim):
             if st.sidebar.button("Đăng Xuất Khách", on_click=logout): pass
 
     else:
+        # --- LOGIC CHO NGƯỜI DÙNG ĐÃ ĐĂNG NHẬP ---
         df_users = st.session_state['df_users']
-        menu_choice = st.sidebar.radio("Chọn chức năng:", ('Đề xuất theo Tên Phim', 'Đề xuất theo Hồ Sơ', 'Đăng Xuất'))
+        
+        # CẬP NHẬT MENU SIDEBAR THEO YÊU CẦU
+        menu_choice = st.sidebar.radio(
+            "Chọn chức năng:", 
+            ('Đề xuất theo Tên Phim', 'Đề xuất theo AI', 'Đề xuất theo Thể loại Yêu thích', 'Đăng Xuất')
+        )
 
         if st.sidebar.button("Đăng Xuất", on_click=logout): pass 
         st.sidebar.write("-" * 20)
 
         if menu_choice == 'Đề xuất theo Tên Phim':
+            # Giữ nguyên logic Content-Based
             st.header("1️⃣ Đề xuất theo Nội dung")
             movie_titles_list = get_unique_movie_titles(df_movies)
             default_movie = st.session_state['last_sim_movie'] if st.session_state['last_sim_movie'] in movie_titles_list else movie_titles_list[0]
@@ -683,22 +691,23 @@ def main_page(df_movies, cosine_sim):
                     recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_sim_result']['Tên phim'].tolist())]
                     plot_genre_popularity(st.session_state['last_sim_movie'], recommended_movies_info, df_movies, is_user_based=False)
 
-        elif menu_choice == 'Đề xuất theo Hồ Sơ':
-            st.header("2️⃣ Đề xuất theo Hồ sơ")
+        elif menu_choice == 'Đề xuất theo AI':
+            # CẬP NHẬT TIÊU ĐỀ
+            st.header("2️⃣ Đề xuất theo AI")
             username = st.session_state['logged_in_user']
             user_row = df_users[df_users['Tên người dùng'] == username]
             
-            # TỰ ĐỘNG GỌI ĐỀ XUẤT NẾU LÀ ĐĂNG KÝ MỚI (Trạng thái đã được set ở hàm register)
+            # Logic TỰ ĐỘNG GỌI ĐỀ XUẤT NẾU LÀ ĐĂNG KÝ MỚI
             is_new_registration_with_results = (
                 not st.session_state['last_profile_recommendations'].empty and
                 'last_profile_recommendations' in st.session_state and 
-                user_row['Phim yêu thích nhất'].iloc[0] == "" and # Chỉ định là hồ sơ mới, chưa có phim yêu thích
-                user_row['5 phim coi gần nhất'].iloc[0] != "[]" # Đã có genres
+                user_row['Phim yêu thích nhất'].iloc[0] == "" and 
+                user_row['5 phim coi gần nhất'].iloc[0] != "[]" 
             )
 
             if is_new_registration_with_results:
-                 st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn (Dựa trên Thể loại đã chọn):")
-            elif st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
+                 st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn (Dựa trên Thể loại đã chọn khi đăng ký):")
+            elif st.button("Tìm Đề Xuất AI", key="find_profile"):
                 recommendations = get_recommendations(username, df_movies)
                 if not recommendations.empty:
                     st.session_state['last_profile_recommendations'] = recommendations
@@ -709,13 +718,59 @@ def main_page(df_movies, cosine_sim):
 
             if not st.session_state['last_profile_recommendations'].empty:
                 recommendations = st.session_state['last_profile_recommendations']
-                if not is_new_registration_with_results: # Tránh hiển thị lại subheader nếu đã hiển thị bên trên
+                if not is_new_registration_with_results: 
                     st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn:")
                 
                 st.dataframe(recommendations, use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
                     recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_profile_recommendations']['Tên phim'].tolist())]
                     plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=True)
+
+        elif menu_choice == 'Đề xuất theo Thể loại Yêu thích':
+            # --- LOGIC MỚI: HIỂN THỊ THỂ LOẠI VÀ CHẠY LẠI ĐỀ XUẤT ---
+            st.header("3️⃣ Đề xuất theo Thể loại Yêu thích")
+            
+            username = st.session_state['logged_in_user']
+            user_row = df_users[df_users['Tên người dùng'] == username]
+            
+            if user_row.empty:
+                st.error("Không tìm thấy hồ sơ người dùng.")
+                return
+
+            recent_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
+            recent_genres = []
+            try:
+                recent_genres = ast.literal_eval(recent_genres_str)
+            except:
+                recent_genres = [g.strip().strip("'") for g in recent_genres_str.strip('[]').split(',') if g.strip()]
+            
+            if not recent_genres:
+                st.warning("Bạn chưa chọn thể loại yêu thích khi đăng ký. Vui lòng đăng ký lại hoặc sử dụng chức năng khác.")
+                return
+
+            recent_genres_display = ', '.join([str(item) for item in recent_genres if str(item).strip()])
+
+            st.info(f"Các thể loại trong hồ sơ của bạn: **{recent_genres_display}**")
+            st.caption("Bấm nút bên dưới để chạy lại thuật toán đề xuất AI dựa trên các thể loại này.")
+
+            if st.button("♻️ Chạy lại Đề xuất AI theo Thể loại này", key="rerun_profile_by_genre"):
+                recommendations = get_recommendations(username, df_movies)
+                if not recommendations.empty:
+                    st.session_state['last_profile_recommendations'] = recommendations
+                    st.session_state['show_profile_plot'] = True 
+                else:
+                    st.warning("Chưa đủ dữ liệu để đề xuất.")
+                st.rerun()
+            
+            # Hiển thị kết quả đề xuất gần nhất nếu có
+            if not st.session_state['last_profile_recommendations'].empty:
+                st.write("---")
+                st.subheader("Kết quả Đề xuất AI gần nhất:")
+                st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
+                if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
+                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_profile_recommendations']['Tên phim'].tolist())]
+                    plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=True)
+
 
 if __name__ == '__main__':
     df_movies, cosine_sim = load_and_preprocess_static_data()
