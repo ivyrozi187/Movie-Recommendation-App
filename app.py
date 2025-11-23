@@ -300,8 +300,11 @@ def draw_registration_topic_cards():
             """, unsafe_allow_html=True)
 
 
-def register_new_user_form(df_movies):
-    """Form đăng ký người dùng mới (Đã sửa đổi theo yêu cầu)."""
+def register_new_user_form(df_movies, cosine_sim):
+    """
+    Form đăng ký người dùng mới. 
+    Đã CẬP NHẬT: Sau khi đăng ký thành công, sẽ TỰ ĐỘNG ĐỀ XUẤT PHIM.
+    """
     st.header("📝 Đăng Ký Tài Khoản Mới")
     st.info("📢 Người dùng mới sẽ chỉ tồn tại trong phiên làm việc hiện tại.")
 
@@ -339,7 +342,7 @@ def register_new_user_form(df_movies):
             st.error("❌ Vui lòng chọn ít nhất 1 thể loại.")
             return
         
-        # --- LOGIC MỚI: CHUYỂN ĐỔI TOPIC -> GENRES ---
+        # --- BƯỚC 1: XỬ LÝ DỮ LIỆU VÀ LƯU VÀO DF_USERS (TẠM) ---
         mapped_genres = set()
         for topic in selected_topics:
             if topic in INTRO_TOPICS:
@@ -347,11 +350,10 @@ def register_new_user_form(df_movies):
         
         final_genres_list = list(mapped_genres)
         
-        # Tạo ID mới
         max_id = df_users['ID'].max() if not df_users.empty and pd.notna(df_users['ID'].max()) else 0
         new_id = int(max_id) + 1
         
-        # Lưu trữ
+        # Cập nhật DataFrame người dùng
         new_user_data = {
             'ID': [new_id],
             'Tên người dùng': [username],
@@ -359,12 +361,25 @@ def register_new_user_form(df_movies):
             'Phim yêu thích nhất': [""] 
         }
         new_user_df = pd.DataFrame(new_user_data)
-        
         st.session_state['df_users'] = pd.concat([df_users, new_user_df], ignore_index=True)
         
         st.session_state['logged_in_user'] = username
+        
+        # --- BƯỚC 2: TỰ ĐỘNG GỌI ĐỀ XUẤT HỒ SƠ VÀ LƯU VÀO SESSION STATE ---
+        # Gọi hàm đề xuất cho người dùng mới
+        recommendations = get_recommendations(username, df_movies)
+
+        if not recommendations.empty:
+            st.session_state['last_profile_recommendations'] = recommendations
+            st.session_state['show_profile_plot'] = True
+        else:
+            st.session_state['last_profile_recommendations'] = pd.DataFrame()
+            st.session_state['show_profile_plot'] = False
+
         st.balloons()
         st.success(f"🎉 Đăng ký thành công! Đã thiết lập hồ sơ theo sở thích: {', '.join(selected_topics)}.")
+        
+        # --- BƯỚC 3: CHẠY LẠI ỨNG DỤNG ĐỂ HIỂN THỊ KẾT QUẢ ĐỀ XUẤT ---
         st.rerun() 
 
 
@@ -385,7 +400,7 @@ def login_form():
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
-def authentication_page(df_movies):
+def authentication_page(df_movies, cosine_sim):
     """Trang Xác thực."""
     st.title("🎬 HỆ THỐNG ĐỀ XUẤT PHIM")
     
@@ -404,7 +419,8 @@ def authentication_page(df_movies):
         st.button("🚀 Thử Dùng Với Chế Độ Khách (Zero-Click)", key="btn_guest", on_click=login_as_guest)
     
     elif st.session_state['auth_mode'] == 'register':
-        register_new_user_form(df_movies)
+        # Truyền thêm cosine_sim vào đây để có thể gọi hàm get_recommendations bên trong
+        register_new_user_form(df_movies, cosine_sim)
 
 # ==============================================================================
 # III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ (GIỮ NGUYÊN)
@@ -672,7 +688,17 @@ def main_page(df_movies, cosine_sim):
             username = st.session_state['logged_in_user']
             user_row = df_users[df_users['Tên người dùng'] == username]
             
-            if st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
+            # TỰ ĐỘNG GỌI ĐỀ XUẤT NẾU LÀ ĐĂNG KÝ MỚI (Trạng thái đã được set ở hàm register)
+            is_new_registration_with_results = (
+                not st.session_state['last_profile_recommendations'].empty and
+                'last_profile_recommendations' in st.session_state and 
+                user_row['Phim yêu thích nhất'].iloc[0] == "" and # Chỉ định là hồ sơ mới, chưa có phim yêu thích
+                user_row['5 phim coi gần nhất'].iloc[0] != "[]" # Đã có genres
+            )
+
+            if is_new_registration_with_results:
+                 st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn (Dựa trên Thể loại đã chọn):")
+            elif st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
                 recommendations = get_recommendations(username, df_movies)
                 if not recommendations.empty:
                     st.session_state['last_profile_recommendations'] = recommendations
@@ -682,8 +708,11 @@ def main_page(df_movies, cosine_sim):
                 st.rerun()
 
             if not st.session_state['last_profile_recommendations'].empty:
-                st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn:")
-                st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
+                recommendations = st.session_state['last_profile_recommendations']
+                if not is_new_registration_with_results: # Tránh hiển thị lại subheader nếu đã hiển thị bên trên
+                    st.subheader(f"✅ Đề xuất Dành Riêng Cho Bạn:")
+                
+                st.dataframe(recommendations, use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
                     recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_profile_recommendations']['Tên phim'].tolist())]
                     plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=True)
@@ -695,4 +724,5 @@ if __name__ == '__main__':
     if st.session_state['logged_in_user']:
         main_page(df_movies, cosine_sim)
     else:
-        authentication_page(df_movies)
+        # Truyền df_movies và cosine_sim vào authentication_page
+        authentication_page(df_movies, cosine_sim)
