@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 import sys 
 import random 
+import matplotlib.colors as mcolors
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
@@ -458,8 +459,78 @@ def authentication_page(df_movies, cosine_sim):
         register_new_user_form(df_movies, cosine_sim)
 
 # ==============================================================================
-# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ (GIỮ NGUYÊN)
+# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
 # ==============================================================================
+
+# Tạo danh sách màu sắc rực rỡ và dễ phân biệt
+def get_vibrant_colors(n):
+    """Tạo n màu sắc rực rỡ và dễ phân biệt."""
+    # Dùng colormap 'hsv' để lấy các màu phân bổ đều trên bánh xe màu
+    hsv_map = plt.cm.get_cmap('hsv', n)
+    # Chuyển đổi từ RGB sang mã HEX
+    colors = [mcolors.rgb2hex(hsv_map(i)[:3]) for i in range(n)]
+    return colors
+
+def plot_recommendation_comparison(df_results, recommendation_type, movie_name=None):
+    """
+    Vẽ biểu đồ so sánh điểm số đề xuất (hoặc độ phổ biến) của các phim.
+    Mỗi phim một màu riêng biệt.
+    """
+    if df_results.empty:
+        st.warning("Không có dữ liệu để vẽ biểu đồ.")
+        return
+
+    # 1. Xác định Cột điểm và Tiêu đề
+    if 'weighted_score' in df_results.columns:
+        score_col = 'weighted_score'
+        y_label = "Điểm Đề xuất Tổng hợp (Similarity + Popularity)"
+        title_prefix = f"So sánh Đề xuất theo Tên Phim ('{movie_name}')"
+    elif 'Similarity_Score' in df_results.columns:
+        score_col = 'Similarity_Score'
+        y_label = "Điểm Giống nhau (Genre Match)"
+        title_prefix = f"So sánh Đề xuất theo AI (Genre Score)"
+    elif 'combined_zero_click_score' in df_results.columns:
+        score_col = 'combined_zero_click_score'
+        y_label = "Điểm Zero-Click (Global Trend + Genre Boost)"
+        title_prefix = "So sánh Đề xuất Zero-Click"
+    else:
+        # Fallback nếu không tìm thấy cột điểm, dùng Độ phổ biến
+        score_col = 'Độ phổ biến'
+        y_label = "Độ Phổ Biến"
+        title_prefix = "So sánh Độ Phổ Biến"
+        
+    title = f"{title_prefix}\n({recommendation_type})"
+
+    # Sắp xếp theo điểm số để biểu đồ trực quan hơn
+    df_plot = df_results.sort_values(by=score_col, ascending=True).copy()
+    
+    # 2. Tạo màu sắc riêng cho mỗi phim
+    num_movies = len(df_plot)
+    colors = get_vibrant_colors(num_movies)
+
+    # 3. Vẽ biểu đồ
+    fig, ax = plt.subplots(figsize=(10, num_movies * 0.6)) # Chiều cao linh hoạt
+    
+    # Dùng biểu đồ cột ngang để tên phim dễ đọc hơn
+    bars = ax.barh(df_plot['Tên phim'], df_plot[score_col], 
+                   color=colors, edgecolor='black', alpha=0.8)
+
+    # 4. Thêm nhãn giá trị lên thanh
+    for bar in bars:
+        width = bar.get_width()
+        ax.text(width + ax.get_xlim()[1]*0.01, bar.get_y() + bar.get_height()/2, 
+                f'{width:.2f}', ha='left', va='center', fontsize=10, weight='bold')
+
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel(y_label)
+    ax.set_ylabel("Tên Phim")
+    
+    # Điều chỉnh giới hạn trục x để nhãn không bị cắt
+    ax.set_xlim(0, ax.get_xlim()[1] * 1.1)
+    
+    plt.tight_layout()
+    st.pyplot(fig)
+
 
 def get_zero_click_recommendations(df_movies, selected_genres, num_recommendations=15):
     WEIGHT_POPULARITY = 0.50 
@@ -543,69 +614,6 @@ def recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine
     df_result = df_result.sort_values(by='weighted_score', ascending=False)
     return df_result[['Tên phim', 'weighted_score', 'similarity', 'Độ phổ biến', 'Thể loại phim']].head(10)
 
-def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_based=False):
-    df_users = st.session_state['df_users']
-    combined_df = recommended_movies_df.copy() 
-    
-    if is_user_based:
-        username = st.session_state['logged_in_user']
-        user_row = df_users[df_users['Tên người dùng'] == username]
-        
-        if user_row.empty: return # Thêm kiểm tra rỗng ở đây
-        
-        user_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
-        user_genres_list = []
-        try:
-            user_genres_list = ast.literal_eval(user_genres_str)
-            if not isinstance(user_genres_list, list): user_genres_list = []
-        except:
-            user_genres_list = [m.strip().strip("'") for m in user_genres_str.strip('[]').split(',') if m.strip()]
-        
-        genre_data_for_plot = []
-        for genre in user_genres_list:
-            avg_pop = df_movies[df_movies['Thể loại phim'].str.contains(genre, case=False, na=False)]['Độ phổ biến'].mean()
-            genre_data_for_plot.append({'Tên phim': f'Hồ sơ: {genre}', 'Thể loại phim': genre, 'Độ phổ biến': avg_pop if pd.notna(avg_pop) else 0})
-
-        watched_genres_df = pd.DataFrame(genre_data_for_plot)
-        combined_df = pd.concat([watched_genres_df[['Thể loại phim', 'Độ phổ biến']], recommended_movies_df[['Thể loại phim', 'Độ phổ biến']]], ignore_index=True)
-        title = f"Độ Phổ Biến Thể Loại (Hồ sơ {st.session_state['logged_in_user']} & Đề xuất)"
-
-    else:
-        if st.session_state['logged_in_user'] == GUEST_USER:
-             title = "Độ Phổ Biến Thể Loại (Đề xuất Zero-Click)"
-        else:
-            movie_row = df_movies[df_movies['Tên phim'].str.lower() == movie_name.lower()]
-            if movie_row.empty: return
-            combined_df = pd.concat([movie_row, recommended_movies_df], ignore_index=True)
-            title = f"Độ Phổ Biến TB của Các Thể Loại Phim Liên Quan đến '{movie_name}'"
-
-    genres_data = []
-    combined_df = combined_df[['Thể loại phim', 'Độ phổ biến']].dropna()
-    for index, row in combined_df.iterrows():
-        genres_list = [g.strip() for g in row['Thể loại phim'].split(',') if g.strip()]
-        for genre in genres_list:
-            genres_data.append({'Thể loại': genre, 'Độ phổ biến': row['Độ phổ biến']})
-
-    df_plot = pd.DataFrame(genres_data)
-    if df_plot.empty: return
-        
-    genre_avg_pop = df_plot.groupby('Thể loại')['Độ phổ biến'].mean().reset_index()
-    top_7_genres = genre_avg_pop.sort_values(by='Độ phổ biến', ascending=False).head(7)
-    overall_avg_pop = df_plot['Độ phổ biến'].mean()
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    bars = ax.bar(top_7_genres['Thể loại'], top_7_genres['Độ phổ biến'], color='skyblue', edgecolor='black', alpha=0.8)
-    ax.axhline(overall_avg_pop, color='red', linestyle='--', linewidth=1.5, label=f'TB Tổng thể ({overall_avg_pop:.1f})')
-    for bar in bars:
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5, round(bar.get_height(), 1), ha='center', fontsize=10, weight='bold')
-
-    ax.set_title(title, fontsize=14)
-    ax.set_xlabel("Thể loại phim")
-    ax.set_ylabel("Độ Phổ Biến Trung Bình")
-    plt.xticks(rotation=45, ha='right', fontsize=10)
-    ax.legend(loc='upper right')
-    plt.tight_layout()
-    st.pyplot(fig) 
 
 # ==============================================================================
 # IV. GIAO DIỆN CHÍNH (MAIN PAGE)
@@ -707,8 +715,7 @@ def main_page(df_movies, cosine_sim):
                 st.dataframe(st.session_state['last_guest_result'], use_container_width=True)
                 
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_guest_plot'], key="plot_guest_check"):
-                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_guest_result']['Tên phim'].tolist())]
-                    plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=False)
+                    plot_recommendation_comparison(st.session_state['last_guest_result'], "Zero-Click")
             
             if st.sidebar.button("Đăng Xuất Khách", on_click=logout): pass
 
@@ -757,8 +764,7 @@ def main_page(df_movies, cosine_sim):
                 st.subheader(f"🎬 Đề xuất cho '{st.session_state['last_sim_movie']}':")
                 st.dataframe(st.session_state['last_sim_result'], use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_sim_plot'], key="plot_sim_check"):
-                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_sim_result']['Tên phim'].tolist())]
-                    plot_genre_popularity(st.session_state['last_sim_movie'], recommended_movies_info, df_movies, is_user_based=False)
+                    plot_recommendation_comparison(st.session_state['last_sim_result'], "Tên Phim", movie_name=st.session_state['last_sim_movie'])
 
         elif menu_choice == 'Đề xuất theo AI':
             # CẬP NHẬT TIÊU ĐỀ
@@ -790,8 +796,7 @@ def main_page(df_movies, cosine_sim):
                 
                 st.dataframe(recommendations, use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", value=st.session_state['show_profile_plot'], key="plot_profile_check"):
-                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_profile_recommendations']['Tên phim'].tolist())]
-                    plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=True)
+                    plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI")
 
         elif menu_choice == 'Đề xuất theo Thể loại Yêu thích':
             # --- LOGIC MỚI: HIỂN THỊ THỂ LOẠI VÀ CHẠY LẠI ĐỀ XUẤT ---
@@ -829,8 +834,7 @@ def main_page(df_movies, cosine_sim):
                 st.subheader("Kết quả Đề xuất AI gần nhất:")
                 st.dataframe(st.session_state['last_profile_recommendations'], use_container_width=True)
                 if st.checkbox("📊 Hiển thị Biểu đồ", key="plot_profile_check_genre"):
-                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(st.session_state['last_profile_recommendations']['Tên phim'].tolist())]
-                    plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=True)
+                    plot_recommendation_comparison(st.session_state['last_profile_recommendations'], "AI (Theo Thể loại)")
 
 
 if __name__ == '__main__':
