@@ -172,7 +172,7 @@ def login_form():
             if username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = username
                 st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
@@ -340,7 +340,7 @@ def main_page(df_movies, cosine_sim):
     if st.sidebar.button("Đăng Xuất", key="logout_btn"):
         st.session_state['logged_in_user'] = None
         st.session_state['auth_mode'] = 'login'
-        st.experimental_rerun()
+        st.rerun()
         
     st.sidebar.write("-" * 20)
 
@@ -413,3 +413,4 @@ if __name__ == '__main__':
         main_page(df_movies, cosine_sim)
     else:
         authentication_page(df_movies)
+
