@@ -164,7 +164,7 @@ def register_new_user_form(df_movies):
             # 5. Đăng nhập
             st.session_state['logged_in_user'] = username
             st.success(f"🎉 Đăng ký và đăng nhập thành công! Chào mừng, {username}.")
-            st.rerun() # Đã thay st.experimental_rerun() bằng st.rerun()
+            st.rerun() 
 
 def login_form():
     """Form đăng nhập."""
@@ -180,7 +180,7 @@ def login_form():
             if username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = username
                 st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.rerun() # Đã thay st.experimental_rerun() bằng st.rerun()
+                st.rerun() 
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
@@ -213,31 +213,37 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     user_row = df_users[df_users['Tên người dùng'] == username]
     if user_row.empty: return pd.DataFrame()
 
-    # Lấy danh sách phim đã xem
+    # Lấy chuỗi phim đã xem
     watched_movies_str = user_row['5 phim coi gần nhất'].iloc[0]
+    watched_list = []
+    
+    # 1. Cố gắng phân tích cú pháp chuỗi Python list (dành cho người dùng mới đăng ký)
     try:
-        # Cố gắng chuyển chuỗi thành list (nếu nó được lưu dưới dạng chuỗi của list)
         watched_list = ast.literal_eval(watched_movies_str)
-    except (ValueError, SyntaxError, IndexError):
-        # Nếu không phải chuỗi list, giả định là chuỗi phân cách bằng dấu phẩy
-        watched_list = [m.strip() for m in watched_movies_str.strip('[]').replace("'", "").split(',') if m.strip()]
-        if len(watched_list) < 5:
-            # Dùng lại logic chuyển đổi ban đầu để tránh lỗi khi người dùng mới đăng ký
-            try:
-                watched_list = ast.literal_eval(user_row['5 phim coi gần nhất'].iloc[0])
-            except:
-                watched_list = [] # Fallback an toàn
+        if not isinstance(watched_list, list):
+             watched_list = [] # Đặt lại nếu không phải list
+    except (ValueError, SyntaxError):
+        # 2. Nếu thất bại, cố gắng phân tách bằng dấu phẩy và làm sạch (dành cho người dùng từ file CSV cũ)
+        watched_list = [m.strip().strip("'") for m in watched_movies_str.strip('[]').split(',') if m.strip()]
+    
+    # Đảm bảo tất cả phần tử đều là chuỗi
+    watched_list = [str(item) for item in watched_list if str(item).strip()]
+
 
     favorite_movie = user_row['Phim yêu thích nhất'].iloc[0]
     watched_and_favorite = set(watched_list + [favorite_movie])
 
     # Xác định các thể loại yêu thích của người dùng
+    # Đảm bảo rằng watched_list chỉ chứa các tên phim hợp lệ
     watched_genres = df_movies[df_movies['Tên phim'].isin(watched_list)]
     user_genres = set()
     for genres in watched_genres['parsed_genres']:
         user_genres.update(genres)
 
-    if not user_genres: return pd.DataFrame()
+    if not user_genres: 
+        # Cảnh báo này có thể hữu ích khi debug
+        # st.warning(f"Không tìm thấy thể loại nào từ phim đã xem của người dùng {username}.")
+        return pd.DataFrame()
 
     # Loại trừ các phim đã xem/yêu thích
     candidate_movies = df_movies[~df_movies['Tên phim'].isin(watched_and_favorite)].copy()
@@ -296,12 +302,16 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     
     if is_user_based:
         user_row = df_users[df_users['Tên người dùng'] == st.session_state['logged_in_user']]
-        # Xử lý chuỗi list để lấy danh sách phim đã xem
+        # Xử lý chuỗi list để lấy danh sách phim đã xem (Sử dụng logic robust từ get_recommendations)
         watched_movies_str = user_row['5 phim coi gần nhất'].iloc[0]
+        watched_list = []
         try:
             watched_list = ast.literal_eval(watched_movies_str)
+            if not isinstance(watched_list, list): watched_list = []
         except:
-            watched_list = [m.strip() for m in watched_movies_str.strip('[]').replace("'", "").split(',') if m.strip()]
+            watched_list = [m.strip().strip("'") for m in watched_movies_str.strip('[]').split(',') if m.strip()]
+        
+        watched_list = [str(item) for item in watched_list if str(item).strip()]
             
         watched_df = df_movies[df_movies['Tên phim'].isin(watched_list)]
         
@@ -311,7 +321,9 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
 
     else:
         movie_row = df_movies[df_movies['Tên phim'].str.lower() == movie_name.lower()]
-        if movie_row.empty: return
+        if movie_row.empty: 
+            st.error(f"Không tìm thấy thông tin phim gốc '{movie_name}' để so sánh.")
+            return
         # Kết hợp phim gốc và phim được đề xuất
         combined_df = pd.concat([movie_row, recommended_movies_df], ignore_index=True)
         title = f"Độ Phổ Biến TB của Các Thể Loại Phim Liên Quan đến '{movie_name}'"
@@ -332,7 +344,7 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     df_plot = pd.DataFrame(genres_data)
     
     if df_plot.empty:
-        st.warning("Không đủ dữ liệu thể loại để vẽ biểu đồ.")
+        st.warning("Không đủ dữ liệu thể loại (Thường do thông tin phim bị thiếu thể loại) để vẽ biểu đồ. Vui lòng kiểm tra file `movie_info_1000.csv`.")
         return
         
     genre_avg_pop = df_plot.groupby('Thể loại')['Độ phổ biến'].mean().reset_index()
@@ -380,7 +392,7 @@ def main_page(df_movies, cosine_sim):
     if st.sidebar.button("Đăng Xuất", key="logout_btn"):
         st.session_state['logged_in_user'] = None
         st.session_state['auth_mode'] = 'login'
-        st.rerun() # Đã thay st.experimental_rerun() bằng st.rerun()
+        st.rerun() 
         
     st.sidebar.write("-" * 20)
 
@@ -420,12 +432,16 @@ def main_page(df_movies, cosine_sim):
         # Hiển thị 5 phim đã xem gần nhất
         recent_films_str = user_row['5 phim coi gần nhất'].iloc[0]
         # Xử lý chuỗi để hiển thị đẹp hơn
+        recent_films = []
         try:
-            recent_films = ', '.join(ast.literal_eval(recent_films_str))
+            recent_films = ast.literal_eval(recent_films_str)
+            if not isinstance(recent_films, list): recent_films = []
         except:
-            recent_films = recent_films_str.strip('[]').replace("'", "")
-            
-        st.info(f"5 Phim đã xem gần nhất: {recent_films}")
+            recent_films = [m.strip().strip("'") for m in recent_films_str.strip('[]').split(',') if m.strip()]
+        
+        recent_films_display = ', '.join([str(item) for item in recent_films if str(item).strip()])
+
+        st.info(f"5 Phim đã xem gần nhất: {recent_films_display}")
         
         if st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
             recommendations = get_recommendations(username, df_movies, num_recommendations=10)
