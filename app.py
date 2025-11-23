@@ -7,16 +7,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 import sys 
-import random 
+import random # Thêm thư viện random để tạo màu ngẫu nhiên
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
 MOVIE_DATA_FILE = "movie_info_1000.csv"
 
 # --- CONSTANT ---
-GUEST_USER = "Guest_ZeroClick" 
+GUEST_USER = "Guest_ZeroClick" # Định danh cho người dùng chế độ Khách
 
-# Bản đồ ánh xạ chủ đề hiển thị (dùng cho Guest mode)
+# Bản đồ ánh xạ chủ đề hiển thị (như trong ảnh) sang thể loại (genres) và màu sắc (CSS)
+# Giao diện này chỉ dùng cho Guest mode (Zero-Click)
 INTRO_TOPICS = {
     "Marvel": {"genres": ["Action", "Sci-Fi", "Fantasy"], "color": "#7983e2", "gradient": "#5c67e2"},
     "4K": {"genres": ["Action", "Adventure", "Sci-Fi"], "color": "#8d90a7", "gradient": "#7e8399"},
@@ -34,7 +35,7 @@ if 'ALL_UNIQUE_GENRES' not in st.session_state:
 if 'ALL_GENRE_TOPICS' not in st.session_state:
     st.session_state['ALL_GENRE_TOPICS'] = {}
 
-# --- KHỞI TẠO BIẾN TRẠNG THÁI (SESSION STATE) ---
+# --- KHỞI TẠO BIẾN TRẠNG THÁT (SESSION STATE) ---
 if 'logged_in_user' not in st.session_state:
     st.session_state['logged_in_user'] = None
 if 'auth_mode' not in st.session_state:
@@ -122,7 +123,6 @@ def load_and_preprocess_static_data():
                  df_movies['recency_score'] = (df_movies['Năm phát hành'] - min_year) / (max_year - min_year)
             else:
                  df_movies['recency_score'] = 0.5 
-
         else:
             df_movies['recency_score'] = df_movies["popularity_norm"] * 0.1 
 
@@ -148,11 +148,8 @@ def load_and_preprocess_static_data():
         
         # Tạo ánh xạ màu sắc cho tất cả thể loại (dùng cho giao diện đăng ký)
         genre_topics = {}
-        # Đảm bảo các màu sắc dễ nhìn và phân biệt
-        default_colors = ["#4D70B3", "#8A4D96", "#4DA277", "#D47E3E", "#A63D3D", "#4B5563"]
-        for i, genre in enumerate(st.session_state['ALL_UNIQUE_GENRES']):
-            # Dùng màu có sẵn cho các thẻ đầu, sau đó dùng random
-            color1 = default_colors[i % len(default_colors)]
+        for genre in st.session_state['ALL_UNIQUE_GENRES']:
+            color1 = generate_random_color()
             color2 = generate_random_color()
             genre_topics[genre] = {"genres": [genre], "color": color1, "gradient": color2}
         st.session_state['ALL_GENRE_TOPICS'] = genre_topics
@@ -206,7 +203,7 @@ def login_as_guest():
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_intro_topics'] = [] # Reset topic selection
     st.session_state['last_guest_result'] = pd.DataFrame() # Reset results
-    st.rerun() # <-- Đã cập nhật thành st.rerun()
+    st.rerun() # Chạy lại để chuyển sang main_page
 
 def logout():
     """Hàm callback để Đăng xuất."""
@@ -222,7 +219,7 @@ def select_topic(topic_key):
     """Lưu chủ đề đã chọn và kích hoạt tìm kiếm."""
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame() # Xóa kết quả cũ
-    st.rerun() # <-- Đã cập nhật thành st.rerun()
+    st.rerun()
 
 # Hàm callback khi bấm vào thẻ thể loại (Registration Mode)
 def toggle_genre_selection(genre):
@@ -234,79 +231,67 @@ def toggle_genre_selection(genre):
 # ---------------------------
 
 def draw_registration_genre_cards():
-    """Vẽ giao diện chọn thẻ thể loại cho mục đích Đăng ký, sử dụng CSS để tạo kiểu cho nút bấm Streamlit."""
-    
+    """Vẽ giao diện chọn thẻ thể loại cho mục đích Đăng ký."""
     st.subheader("Chọn Thể Loại Bạn Yêu Thích (Tối thiểu 5 thể loại)")
     
-    # CSS TẠO KIỂU CHUNG CHO NÚT (KHÔNG BỊ RÒ RỈ VÀO CÁC NÚT ĐĂNG NHẬP/ĐĂNG KÝ)
+    # CSS cho các thẻ
     st.markdown("""
     <style>
-        /* Tạo kiểu cơ bản cho nút, đây là giao diện thẻ chung */
-        .stButton button {
+        .reg-card {
             border-radius: 15px;
             color: white;
-            padding: 15px 10px;
+            padding: 15px;
             margin-bottom: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             transition: transform 0.1s, box-shadow 0.1s;
+            cursor: pointer;
             text-align: center;
             font-weight: bold;
-            height: 100px; /* Chiều cao cố định để thẻ vuông vắn */
             border: 3px solid transparent;
-            font-size: 1rem;
-            cursor: pointer;
         }
-        /* Style cho nút Đăng ký/Đăng nhập ở trang đầu để chúng không bị ảnh hưởng */
-        div[data-testid*="stHorizontalBlock"] > div.stButton > button {
-             border-radius: 8px;
-             height: 50px;
-             font-weight: normal;
-             box-shadow: none;
-             transition: none;
-             color: inherit;
-             background-color: transparent !important;
-             border: 1px solid #ccc;
+        .reg-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-
+        .reg-card.selected {
+            border-color: #f63366; /* Màu đỏ Streamlit cho thẻ đã chọn */
+            box-shadow: 0 0 10px #f63366;
+        }
     </style>
     """, unsafe_allow_html=True)
 
     genres = st.session_state['ALL_UNIQUE_GENRES']
     genre_map = st.session_state['ALL_GENRE_TOPICS']
     
+    # Tạo layout 4 cột
     cols = st.columns(4)
     
     for i, genre in enumerate(genres):
         data = genre_map.get(genre, {"color": "#4b5563", "gradient": "#374151"})
         is_selected = genre in st.session_state['selected_reg_genres']
         
-        # Style cho nút dựa trên trạng thái đã chọn
-        base_style = f"background: linear-gradient(135deg, {data['color']}, {data['gradient']}); color: white;"
-        selected_style = f"border-color: #f63366; box-shadow: 0 0 10px #f63366;" if is_selected else ""
+        card_class = "reg-card selected" if is_selected else "reg-card"
         
+        # HTML cho mỗi thẻ
+        card_html = f"""
+        <div class="{card_class}" style="background: linear-gradient(135deg, {data['color']}, {data['gradient']});">
+            {genre}
+        </div>
+        """
+        
+        # Hiển thị thẻ và nút ẩn để bắt sự kiện click
         with cols[i % 4]:
-            # Tạo nút Streamlit
-            st.button(
-                genre,
-                key=f"toggle_reg_{genre}",
-                on_click=toggle_genre_selection,
-                args=(genre,),
-                use_container_width=True,
-            )
+            st.markdown(card_html, unsafe_allow_html=True)
             
-            # Inject CSS cho nút bấm cụ thể này dựa trên style đã chọn và màu gradient
-            st.markdown(
-                f"""
-                <style>
-                    /* Tìm nút theo key và áp dụng style thẻ/gradient */
-                    div[data-testid*="stButton-{f'toggle_reg_{genre}'.lower()}"] > button {{
-                        {base_style}
-                        {selected_style}
-                    }}
-                </style>
-                """,
-                unsafe_allow_html=True
-            )
+            # Nút ẩn để kích hoạt callback
+            st.button(f"Toggle_{genre}", 
+                      key=f"toggle_reg_{genre}", 
+                      on_click=toggle_genre_selection, 
+                      args=(genre,),
+                      use_container_width=True, 
+                      help=f"Chọn hoặc bỏ chọn thể loại {genre}")
+            # Dùng CSS để ẩn nút Streamlit mặc định đi, chỉ giữ lại thẻ HTML
+            st.markdown("""<style>div[data-testid*="stButton"] > button { height: 0; padding: 0; opacity: 0; margin-top: -160px; }</style>""", unsafe_allow_html=True)
 
 
 def register_new_user_form(df_movies):
@@ -366,7 +351,7 @@ def register_new_user_form(df_movies):
             
             st.session_state['logged_in_user'] = username
             st.success(f"🎉 Đăng ký và đăng nhập thành công! Chào mừng, {username}.")
-            st.rerun() # <-- Đã cập nhật thành st.rerun()
+            st.rerun() 
 
 def login_form():
     """Form đăng nhập."""
@@ -382,7 +367,7 @@ def login_form():
             if username in df_users['Tên người dùng'].values:
                 st.session_state['logged_in_user'] = username
                 st.success(f"✅ Đăng nhập thành công! Chào mừng, {username}.")
-                st.rerun() # <-- Đã cập nhật thành st.rerun()
+                st.rerun() 
             else:
                 st.error("❌ Tên người dùng không tồn tại.")
 
@@ -615,7 +600,7 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     fig, ax = plt.subplots(figsize=(10, 6))
 
     bars = ax.bar(top_7_genres['Thể loại'], top_7_genres['Độ phổ biến'], 
-                  color='skyblue', edgecolor='black', alpha=0.8)
+                  color='skyblue', edgecolor='black', alpha=0.😎
 
     ax.axhline(overall_avg_pop, color='red', linestyle='--', linewidth=1.5, 
                label=f'TB Tổng thể ({overall_avg_pop:.1f})')
@@ -731,7 +716,7 @@ def main_page(df_movies, cosine_sim):
                 selected_genre_list.extend(INTRO_TOPICS.get(topic, {}).get("genres", []))
             
             topic_names = ", ".join(selected_topics)
-            st.info(f"Đề xuất đang được cá nhân hóa dựa trên chủ đề bạn đã chọn: **{topic_names}**.")
+            st.info(f"Đề xuất đang được cá nhân hóa dựa trên chủ đề bạn đã chọn: *{topic_names}*.")
             
             # Tự động tìm kiếm nếu chưa có kết quả
             if st.session_state['last_guest_result'].empty:
@@ -752,8 +737,8 @@ def main_page(df_movies, cosine_sim):
                 st.dataframe(zero_click_results, use_container_width=True)
                 
                 show_plot_guest = st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", 
-                                              value=st.session_state['show_guest_plot'],
-                                              key="plot_guest_check")
+                                                value=st.session_state['show_guest_plot'],
+                                                key="plot_guest_check")
                 
                 if show_plot_guest:
                     recommended_movies_info = df_movies[df_movies['Tên phim'].isin(zero_click_results['Tên phim'].tolist())]
@@ -799,7 +784,7 @@ def main_page(df_movies, cosine_sim):
                     st.session_state['last_sim_result'] = pd.DataFrame()
                     st.session_state['show_sim_plot'] = False
                     st.warning("⚠️ Không tìm thấy đề xuất hoặc phim gốc không tồn tại.")
-                st.rerun() # <-- Đã cập nhật thành st.rerun()
+                st.rerun() 
 
             if not st.session_state['last_sim_result'].empty:
                 result = st.session_state['last_sim_result']
@@ -848,7 +833,7 @@ def main_page(df_movies, cosine_sim):
                     st.session_state['last_profile_recommendations'] = pd.DataFrame()
                     st.session_state['show_profile_plot'] = False
                     st.warning("⚠️ Không có đề xuất nào được tạo. Kiểm tra dữ liệu thể loại phim đã xem.")
-                st.rerun() # <-- Đã cập nhật thành st.rerun()
+                st.rerun() 
 
             if not st.session_state['last_profile_recommendations'].empty:
                 recommendations = st.session_state['last_profile_recommendations']
@@ -871,7 +856,7 @@ def main_page(df_movies, cosine_sim):
 # V. CHẠY ỨNG DỤNG CHÍNH
 # ==============================================================================
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     # 1. Tải dữ liệu tĩnh (Chỉ chạy 1 lần)
     df_movies, cosine_sim = load_and_preprocess_static_data()
     
