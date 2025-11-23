@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import ast
-import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
-import sys
+import matplotlib.pyplot as plt # Import này là cần thiết cho biểu đồ
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
@@ -95,13 +94,11 @@ def register_new_user_form(df_movies):
     st.header("📝 Đăng Ký Tài Khoản Mới (Phiên Tạm Thời)")
     st.info("📢 Người dùng mới sẽ chỉ tồn tại trong phiên làm việc hiện tại của bạn.")
 
-    # Lấy DataFrame người dùng hiện tại từ Session State
     df_users = st.session_state['df_users']
     movie_titles_list = get_unique_movie_titles(df_movies)
 
     with st.form("register_form"):
         username = st.text_input("Tên người dùng mới (Duy nhất):").strip()
-
         st.subheader("Chọn Phim Đã Xem (Tối thiểu 5 phim để có hồ sơ tốt)")
         
         recent_list_raw = st.multiselect(
@@ -120,7 +117,6 @@ def register_new_user_form(df_movies):
         submitted = st.form_submit_button("Đăng Ký & Đăng Nhập")
 
         if submitted:
-            # 1. Kiểm tra đầu vào
             if not username:
                 st.error("Vui lòng nhập tên người dùng.")
                 return
@@ -133,11 +129,9 @@ def register_new_user_form(df_movies):
                  st.warning("Vui lòng chọn tối thiểu 5 phim đã xem gần nhất.")
                  return
             
-            # 2. Tạo ID mới
             max_id = df_users['ID'].max() if not df_users.empty and pd.notna(df_users['ID'].max()) else 0
             new_id = int(max_id) + 1
             
-            # 3. Tạo dữ liệu mới
             new_user_data = {
                 'ID': [new_id],
                 'Tên người dùng': [username],
@@ -146,10 +140,8 @@ def register_new_user_form(df_movies):
             }
             new_user_df = pd.DataFrame(new_user_data)
             
-            # 4. CẬP NHẬT SESSION STATE (KHÔNG GHI FILE)
             st.session_state['df_users'] = pd.concat([df_users, new_user_df], ignore_index=True)
             
-            # 5. Đăng nhập
             st.session_state['logged_in_user'] = username
             st.success(f"🎉 Đăng ký và đăng nhập thành công! Chào mừng, {username}.")
             st.rerun()
@@ -192,13 +184,14 @@ def authentication_page(df_movies):
         register_new_user_form(df_movies)
 
 # ==============================================================================
-# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
+# III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ (Logic Giữ Nguyên)
 # ==============================================================================
 
 def get_recommendations(username, df_movies, num_recommendations=10):
     """Đề xuất phim dựa trên 5 phim người dùng xem gần nhất và sở thích thể loại."""
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
+    # ... (Logic giữ nguyên)
     if user_row.empty: return pd.DataFrame()
 
     try:
@@ -379,7 +372,7 @@ def main_page(df_movies, cosine_sim):
         
         if st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
             recommendations = get_recommendations(username, df_movies, num_recommendations=10)
-            
+
             if not recommendations.empty:
                 st.subheader(f"✅ 10 Đề xuất Phim Dành Cho Bạn:")
                 st.dataframe(recommendations, use_container_width=True)
