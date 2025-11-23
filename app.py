@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
 import sys 
+import random # Thêm thư viện random để tạo màu ngẫu nhiên
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
@@ -16,6 +17,7 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 GUEST_USER = "Guest_ZeroClick" # Định danh cho người dùng chế độ Khách
 
 # Bản đồ ánh xạ chủ đề hiển thị (như trong ảnh) sang thể loại (genres) và màu sắc (CSS)
+# Giao diện này chỉ dùng cho Guest mode (Zero-Click)
 INTRO_TOPICS = {
     "Marvel": {"genres": ["Action", "Sci-Fi", "Fantasy"], "color": "#7983e2", "gradient": "#5c67e2"},
     "4K": {"genres": ["Action", "Adventure", "Sci-Fi"], "color": "#8d90a7", "gradient": "#7e8399"},
@@ -25,7 +27,15 @@ INTRO_TOPICS = {
     "Cổ Trang": {"genres": ["History", "War", "Drama"], "color": "#b85c5c", "gradient": "#a54545"},
 }
 
-# --- KHỞI TẠO BIẾN TRẠNG THÁI (SESSION STATE) ---
+# Lưu các thể loại duy nhất sau khi tiền xử lý
+if 'ALL_UNIQUE_GENRES' not in st.session_state:
+    st.session_state['ALL_UNIQUE_GENRES'] = [] 
+
+# Khối ánh xạ thể loại sang màu sắc cho giao diện Đăng ký (sẽ được điền sau khi load data)
+if 'ALL_GENRE_TOPICS' not in st.session_state:
+    st.session_state['ALL_GENRE_TOPICS'] = {}
+
+# --- KHỞI TẠO BIẾN TRẠNG THÁT (SESSION STATE) ---
 if 'logged_in_user' not in st.session_state:
     st.session_state['logged_in_user'] = None
 if 'auth_mode' not in st.session_state:
@@ -44,6 +54,9 @@ if 'selected_intro_topics' not in st.session_state: st.session_state['selected_i
 if 'last_guest_result' not in st.session_state: st.session_state['last_guest_result'] = pd.DataFrame()
 if 'show_guest_plot' not in st.session_state: st.session_state['show_guest_plot'] = False
 
+# Trạng thái cho việc chọn thể loại khi Đăng ký
+if 'selected_reg_genres' not in st.session_state: st.session_state['selected_reg_genres'] = set()
+
 
 # ==============================================================================
 # I. PHẦN TIỀN XỬ LÝ DỮ LIỆU & HELPERS
@@ -61,6 +74,17 @@ def parse_genres(genre_string):
     genres = [g.strip().replace('"', '') for g in genre_string.split(',')]
     return set(genres)
     
+def get_all_unique_genres(df_movies):
+    """Trích xuất tất cả các thể loại duy nhất từ DataFrame."""
+    all_genres = set()
+    for genres_set in df_movies['parsed_genres']:
+        all_genres.update(genres_set)
+    return sorted(list(all_genres))
+
+def generate_random_color():
+    """Tạo mã màu HEX ngẫu nhiên."""
+    return f'#{random.randint(0, 0xFFFFFF):06x}'
+
 @st.cache_resource 
 def load_and_preprocess_static_data():
     """Tải và tiền xử lý dữ liệu tĩnh (movies và mô hình)."""
@@ -91,21 +115,17 @@ def load_and_preprocess_static_data():
 
         # 3. Tiền xử lý cho Zero-Click (Recency and Global Genre Popularity)
         
-        # 3a. Tính điểm mới nhất (Recency) - Giả định có cột 'Năm phát hành'
         if 'Năm phát hành' in df_movies.columns:
             df_movies['Năm phát hành'] = pd.to_numeric(df_movies['Năm phát hành'], errors='coerce').fillna(pd.Timestamp('now').year)
-            # Chuẩn hóa điểm Recency (Phim mới nhất có điểm cao nhất)
             max_year = df_movies['Năm phát hành'].max()
             min_year = df_movies['Năm phát hành'].min()
             if max_year > min_year:
                  df_movies['recency_score'] = (df_movies['Năm phát hành'] - min_year) / (max_year - min_year)
             else:
-                 df_movies['recency_score'] = 0.5 # Default score if all years are the same
+                 df_movies['recency_score'] = 0.5 
         else:
-            # Nếu cột 'Năm phát hành' không tồn tại, dùng điểm phổ biến làm placeholder
             df_movies['recency_score'] = df_movies["popularity_norm"] * 0.1 
 
-        # 3b. Tính điểm phổ biến thể loại toàn cầu (Global Genre Popularity)
         genres_pop = {}
         for index, row in df_movies.iterrows():
             popularity = row['Độ phổ biến']
@@ -116,13 +136,24 @@ def load_and_preprocess_static_data():
         
         global_genre_popularity = {g: sum(p)/len(p) for g, p in genres_pop.items() if len(p) > 0}
         
-        # Chuẩn hóa điểm phổ biến thể loại
         max_pop = max(global_genre_popularity.values()) if global_genre_popularity else 1
         normalized_genre_pop = {g: p / max_pop for g, p in global_genre_popularity.items()}
 
         df_movies['global_genre_score'] = df_movies['Thể loại phim'].apply(
             lambda x: max([normalized_genre_pop.get(g.strip(), 0) for g in x.split(',')], default=0) if x else 0
         )
+        
+        # --- LƯU TRỮ DANH SÁCH THỂ LOẠI (MỚI) ---
+        st.session_state['ALL_UNIQUE_GENRES'] = get_all_unique_genres(df_movies)
+        
+        # Tạo ánh xạ màu sắc cho tất cả thể loại (dùng cho giao diện đăng ký)
+        genre_topics = {}
+        for genre in st.session_state['ALL_UNIQUE_GENRES']:
+            color1 = generate_random_color()
+            color2 = generate_random_color()
+            genre_topics[genre] = {"genres": [genre], "color": color1, "gradient": color2}
+        st.session_state['ALL_GENRE_TOPICS'] = genre_topics
+
 
         return df_movies, cosine_sim_matrix 
 
@@ -162,6 +193,7 @@ def set_auth_mode(mode):
     st.session_state['auth_mode'] = mode
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
+    st.session_state['selected_reg_genres'] = set() # Reset selected genres for registration
 
 def login_as_guest():
     """Hàm callback để đăng nhập dưới dạng Khách (Zero-Click)."""
@@ -182,36 +214,107 @@ def logout():
     st.session_state['selected_intro_topics'] = [] # Reset topic selection
     st.session_state['last_guest_result'] = pd.DataFrame() # Reset results
 
-# Hàm callback khi bấm vào thẻ chủ đề
+# Hàm callback khi bấm vào thẻ chủ đề (Guest Mode)
 def select_topic(topic_key):
     """Lưu chủ đề đã chọn và kích hoạt tìm kiếm."""
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame() # Xóa kết quả cũ
     st.rerun()
+
+# Hàm callback khi bấm vào thẻ thể loại (Registration Mode)
+def toggle_genre_selection(genre):
+    """Thêm/loại bỏ thể loại đã chọn trong quá trình đăng ký."""
+    if genre in st.session_state['selected_reg_genres']:
+        st.session_state['selected_reg_genres'].remove(genre)
+    else:
+        st.session_state['selected_reg_genres'].add(genre)
 # ---------------------------
 
+def draw_registration_genre_cards():
+    """Vẽ giao diện chọn thẻ thể loại cho mục đích Đăng ký."""
+    st.subheader("Chọn Thể Loại Bạn Yêu Thích (Tối thiểu 5 thể loại)")
+    
+    # CSS cho các thẻ
+    st.markdown("""
+    <style>
+        .reg-card {
+            border-radius: 15px;
+            color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s, box-shadow 0.1s;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            border: 3px solid transparent;
+        }
+        .reg-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .reg-card.selected {
+            border-color: #f63366; /* Màu đỏ Streamlit cho thẻ đã chọn */
+            box-shadow: 0 0 10px #f63366;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    genres = st.session_state['ALL_UNIQUE_GENRES']
+    genre_map = st.session_state['ALL_GENRE_TOPICS']
+    
+    # Tạo layout 4 cột
+    cols = st.columns(4)
+    
+    for i, genre in enumerate(genres):
+        data = genre_map.get(genre, {"color": "#4b5563", "gradient": "#374151"})
+        is_selected = genre in st.session_state['selected_reg_genres']
+        
+        card_class = "reg-card selected" if is_selected else "reg-card"
+        
+        # HTML cho mỗi thẻ
+        card_html = f"""
+        <div class="{card_class}" style="background: linear-gradient(135deg, {data['color']}, {data['gradient']});">
+            {genre}
+        </div>
+        """
+        
+        # Hiển thị thẻ và nút ẩn để bắt sự kiện click
+        with cols[i % 4]:
+            st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Nút ẩn để kích hoạt callback
+            st.button(f"Toggle_{genre}", 
+                      key=f"toggle_reg_{genre}", 
+                      on_click=toggle_genre_selection, 
+                      args=(genre,),
+                      use_container_width=True, 
+                      help=f"Chọn hoặc bỏ chọn thể loại {genre}")
+            # Dùng CSS để ẩn nút Streamlit mặc định đi, chỉ giữ lại thẻ HTML
+            st.markdown("""<style>div[data-testid*="stButton"] > button { height: 0; padding: 0; opacity: 0; margin-top: -160px; }</style>""", unsafe_allow_html=True)
+
+
 def register_new_user_form(df_movies):
-    """Form đăng ký người dùng mới (Lưu vào bộ nhớ Streamlit)."""
+    """Form đăng ký người dùng mới (Sử dụng thẻ thể loại thay vì multiselect)."""
     st.header("📝 Đăng Ký Tài Khoản Mới (Phiên Tạm Thời)")
     st.info("📢 Người dùng mới sẽ chỉ tồn tại trong phiên làm việc hiện tại của bạn.")
-    
+
     df_users = st.session_state['df_users']
     movie_titles_list = get_unique_movie_titles(df_movies)
 
     with st.form("register_form"):
         username = st.text_input("Tên người dùng mới (Duy nhất):").strip()
 
-        st.subheader("Chọn Phim Đã Xem (Tối thiểu 5 phim để có hồ sơ tốt)")
+        # --- GIAO DIỆN CHỌN THỂ LOẠI MỚI ---
+        draw_registration_genre_cards()
         
-        recent_list_raw = st.multiselect(
-            "🎥 5 Phim Đã Xem Gần Nhất:",
-            options=movie_titles_list,
-            key='recent_select',
-            default=movie_titles_list[:5] if len(movie_titles_list) >= 5 else []
-        )
+        # Thể loại đã chọn (Lưu vào 5 phim gần nhất)
+        selected_genres = list(st.session_state['selected_reg_genres'])
         
+        st.caption(f"Đã chọn: {', '.join(selected_genres) if selected_genres else 'Chưa chọn thể loại nào'}")
+
         favorite_movie = st.selectbox(
-            "⭐ Phim Yêu Thích Nhất:",
+            "⭐ Phim Yêu Thích Nhất (Chọn một phim để có hồ sơ tốt hơn):",
             options=movie_titles_list,
             key='favorite_select'
         )
@@ -227,17 +330,19 @@ def register_new_user_form(df_movies):
                 st.error(f"❌ Tên người dùng '{username}' đã tồn tại.")
                 return
             
-            if len(recent_list_raw) < 5:
-                st.warning("Vui lòng chọn tối thiểu 5 phim đã xem gần nhất.")
+            if len(selected_genres) < 5:
+                st.warning(f"Vui lòng chọn tối thiểu 5 thể loại yêu thích. Bạn mới chọn {len(selected_genres)}.")
                 return
             
             max_id = df_users['ID'].max() if not df_users.empty and pd.notna(df_users['ID'].max()) else 0
             new_id = int(max_id) + 1
             
+            # --- LƯU TRỮ DỮ LIỆU MỚI: Dùng list thể loại thay cho list tên phim ---
             new_user_data = {
                 'ID': [new_id],
                 'Tên người dùng': [username],
-                '5 phim coi gần nhất': [str(recent_list_raw)], 
+                # Lưu list thể loại đã chọn (đã stringify) vào cột '5 phim coi gần nhất'
+                '5 phim coi gần nhất': [str(selected_genres)], 
                 'Phim yêu thích nhất': [favorite_movie]
             }
             new_user_df = pd.DataFrame(new_user_data)
@@ -339,38 +444,51 @@ def get_zero_click_recommendations(df_movies, selected_genres, num_recommendatio
 
 
 def get_recommendations(username, df_movies, num_recommendations=10):
-    """Đề xuất phim dựa trên 5 phim người dùng xem gần nhất và sở thích thể loại."""
+    """Đề xuất phim dựa trên 5 phim người dùng xem gần nhất và sở thích thể loại.
+    
+    LƯU Ý: Ở phiên bản mới, cột '5 phim coi gần nhất' lưu trữ list genres đã chọn khi đăng ký.
+    """
     
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
     if user_row.empty: return pd.DataFrame()
 
-    watched_movies_str = user_row['5 phim coi gần nhất'].iloc[0]
-    watched_list = []
+    # Lấy dữ liệu hồ sơ (giờ là list genres)
+    user_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
+    user_genres_list = []
     
     try:
-        watched_list = ast.literal_eval(watched_movies_str)
-        if not isinstance(watched_list, list): watched_list = []
+        # Cố gắng parse list genres (ví dụ: ['Action', 'Comedy'])
+        user_genres_list = ast.literal_eval(user_genres_str)
+        if not isinstance(user_genres_list, list): 
+            user_genres_list = []
     except (ValueError, SyntaxError):
-        watched_list = [m.strip().strip("'") for m in watched_movies_str.strip('[]').split(',') if m.strip()]
-    
-    watched_list = [str(item) for item in watched_list if str(item).strip()]
-
+        # Fallback cho trường hợp dữ liệu cũ (list tên phim) hoặc lỗi parse
+        # Nếu là list tên phim cũ, hệ thống sẽ cố gắng tìm genres từ tên phim đó
+        watched_list = [m.strip().strip("'") for m in user_genres_str.strip('[]').split(',') if m.strip()]
+        
+        # Nếu dữ liệu cũ là tên phim, tìm genres từ các tên phim đó
+        watched_genres_df = df_movies[df_movies['Tên phim'].isin(watched_list)]
+        user_genres_list = []
+        for genres in watched_genres_df['parsed_genres']:
+            user_genres_list.extend(genres)
+        
+    user_genres = set(user_genres_list)
 
     favorite_movie = user_row['Phim yêu thích nhất'].iloc[0]
-    watched_and_favorite = set(watched_list + [favorite_movie])
+    # Lấy thể loại của phim yêu thích nhất để bổ sung vào hồ sơ
+    favorite_movie_genres = df_movies[df_movies['Tên phim'] == favorite_movie]['parsed_genres'].iloc[0] if not df_movies[df_movies['Tên phim'] == favorite_movie].empty else set()
+    user_genres.update(favorite_movie_genres)
 
-    watched_genres = df_movies[df_movies['Tên phim'].isin(watched_list)]
-    user_genres = set()
-    for genres in watched_genres['parsed_genres']:
-        user_genres.update(genres)
 
     if not user_genres: 
         return pd.DataFrame()
 
-    candidate_movies = df_movies[~df_movies['Tên phim'].isin(watched_and_favorite)].copy()
+    # Chỉ loại trừ phim yêu thích nhất khỏi danh sách đề xuất
+    candidate_movies = df_movies[df_movies['Tên phim'] != favorite_movie].copy()
 
     def calculate_score(candidate_genres):
+        # Tính điểm dựa trên số lượng genres chung
         return len(candidate_genres.intersection(user_genres))
 
     candidate_movies['Similarity_Score'] = candidate_movies['parsed_genres'].apply(calculate_score)
@@ -423,27 +541,34 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     
     if is_user_based:
         user_row = df_users[df_users['Tên người dùng'] == st.session_state['logged_in_user']]
-        watched_movies_str = user_row['5 phim coi gần nhất'].iloc[0]
-        watched_list = []
+        
+        # Lấy genres đã chọn trong hồ sơ
+        user_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
+        user_genres_list = []
         try:
-            watched_list = ast.literal_eval(watched_movies_str)
-            if not isinstance(watched_list, list): watched_list = []
+            user_genres_list = ast.literal_eval(user_genres_str)
+            if not isinstance(user_genres_list, list): user_genres_list = []
         except:
-            watched_list = [m.strip().strip("'") for m in watched_movies_str.strip('[]').split(',') if m.strip()]
+            user_genres_list = [m.strip().strip("'") for m in user_genres_str.strip('[]').split(',') if m.strip()]
         
-        watched_list = [str(item) for item in watched_list if str(item).strip()]
-            
-        watched_df = df_movies[df_movies['Tên phim'].isin(watched_list)]
+        # Tạo DataFrame tạm thời cho các genres đã chọn (dùng popularity trung bình)
+        genre_data_for_plot = []
+        for genre in user_genres_list:
+            # Lấy độ phổ biến trung bình của genre đó từ toàn bộ dataset
+            avg_pop = df_movies[df_movies['Thể loại phim'].str.contains(genre, case=False, na=False)]['Độ phổ biến'].mean()
+            genre_data_for_plot.append({'Tên phim': f'Hồ sơ: {genre}', 'Thể loại phim': genre, 'Độ phổ biến': avg_pop if pd.notna(avg_pop) else 0})
+
+        watched_genres_df = pd.DataFrame(genre_data_for_plot)
         
-        combined_df = pd.concat([watched_df, recommended_movies_df], ignore_index=True)
+        # Kết hợp genres hồ sơ (là các genres đã chọn khi đăng ký) và phim đề xuất
+        combined_df = pd.concat([watched_genres_df[['Thể loại phim', 'Độ phổ biến']], recommended_movies_df[['Thể loại phim', 'Độ phổ biến']]], ignore_index=True)
         title = f"Độ Phổ Biến Thể Loại (Hồ sơ {st.session_state['logged_in_user']} & Đề xuất)"
 
     else:
-        # Nếu là Zero-Click, không có phim gốc để so sánh, chỉ lấy recommended_movies_df
+        # Nếu là Zero-Click hoặc Content-based
         if st.session_state['logged_in_user'] == GUEST_USER:
              title = "Độ Phổ Biến Thể Loại (Đề xuất Zero-Click)"
         else:
-            # Dành cho đề xuất Content-based thông thường
             movie_row = df_movies[df_movies['Tên phim'].str.lower() == movie_name.lower()]
             if movie_row.empty: 
                 st.error(f"Không tìm thấy thông tin phim gốc '{movie_name}' để so sánh.")
@@ -465,7 +590,7 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     df_plot = pd.DataFrame(genres_data)
     
     if df_plot.empty:
-        st.warning("Không đủ dữ liệu thể loại (Thường do thông tin phim bị thiếu thể loại) để vẽ biểu đồ. Vui lòng kiểm tra file `movie_info_1000.csv`.")
+        st.warning("Không đủ dữ liệu thể loại để vẽ biểu đồ.")
         return
         
     genre_avg_pop = df_plot.groupby('Thể loại')['Độ phổ biến'].mean().reset_index()
@@ -497,7 +622,7 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
 # ==============================================================================
 
 def draw_interest_cards():
-    """Vẽ giao diện chọn thẻ chủ đề."""
+    """Vẽ giao diện chọn thẻ chủ đề (Guest Mode)."""
     st.header("Bạn đang quan tâm gì?")
     st.markdown("Chọn một hoặc nhiều chủ đề để nhận đề xuất ban đầu được cá nhân hóa:", unsafe_allow_html=True)
     
@@ -551,7 +676,6 @@ def draw_interest_cards():
         """
         
         # Sử dụng st.button để tạo sự kiện click
-        # Đặt button trên st.markdown để nó thực sự kích hoạt Streamlit Rerun
         with cols[i % 3]:
             # Hiển thị thẻ bằng HTML
             st.markdown(card_html, unsafe_allow_html=True)
@@ -687,17 +811,17 @@ def main_page(df_movies, cosine_sim):
                 st.error("LỖI: Không tìm thấy hồ sơ người dùng trong phiên. Vui lòng đăng ký lại.")
                 return
 
-            recent_films_str = user_row['5 phim coi gần nhất'].iloc[0]
-            recent_films = []
+            # Hiển thị các thể loại đã chọn (được lưu trong cột '5 phim coi gần nhất')
+            recent_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
+            recent_genres = []
             try:
-                recent_films = ast.literal_eval(recent_films_str)
-                if not isinstance(recent_films, list): recent_films = []
+                recent_genres = ast.literal_eval(recent_genres_str)
             except:
-                recent_films = [m.strip().strip("'") for m in recent_films_str.strip('[]').split(',') if m.strip()]
+                recent_genres = [g.strip().strip("'") for g in recent_genres_str.strip('[]').split(',') if g.strip()]
             
-            recent_films_display = ', '.join([str(item) for item in recent_films if str(item).strip()])
+            recent_genres_display = ', '.join([str(item) for item in recent_genres if str(item).strip()])
 
-            st.info(f"5 Phim đã xem gần nhất: {recent_films_display}")
+            st.info(f"Thể loại yêu thích đã chọn: {recent_genres_display}")
             
             if st.button("Tìm Đề Xuất Hồ Sơ", key="find_profile"):
                 recommendations = get_recommendations(username, df_movies, num_recommendations=10)
