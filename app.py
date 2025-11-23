@@ -34,7 +34,7 @@ def parse_genres(genre_string):
     genres = [g.strip().replace('"', '') for g in genre_string.split(',')]
     return set(genres)
     
-@st.cache_resource # Chỉ tải dữ liệu tĩnh một lần
+@st.cache_resource
 def load_and_preprocess_static_data():
     """Tải và tiền xử lý dữ liệu tĩnh (movies và mô hình)."""
     try:
@@ -67,7 +67,6 @@ def load_and_preprocess_static_data():
 
 def initialize_user_data():
     """Khởi tạo hoặc tải dữ liệu người dùng vào Session State."""
-    # CHỈ CHẠY 1 LẦN KHI APP KHỞI ĐỘNG
     if 'df_users' not in st.session_state:
         try:
             df_users = load_data(USER_DATA_FILE)
