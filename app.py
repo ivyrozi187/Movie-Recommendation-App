@@ -471,7 +471,7 @@ def get_zero_click_recommendations(df_movies, selected_genres, num_recommendatio
 def get_recommendations(username, df_movies, num_recommendations=10):
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
-    if user_row.empty: return pd.DataFrame()
+    if user_row.empty: return pd.DataFrame() # Kiểm tra rỗng
 
     user_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
     user_genres_list = []
@@ -489,7 +489,7 @@ def get_recommendations(username, df_movies, num_recommendations=10):
     user_genres = set(user_genres_list)
     
     # Lấy phim yêu thích (nếu có) để boost thêm
-    # Do đã đảm bảo cột này tồn tại ở initialize_user_data, việc truy cập là an toàn
+    # Đã an toàn vì initialize_user_data đảm bảo cột này tồn tại
     favorite_movie = user_row['Phim yêu thích nhất'].iloc[0]
     if favorite_movie:
         favorite_movie_genres = df_movies[df_movies['Tên phim'] == favorite_movie]['parsed_genres'].iloc[0] if not df_movies[df_movies['Tên phim'] == favorite_movie].empty else set()
@@ -529,7 +529,11 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     combined_df = recommended_movies_df.copy() 
     
     if is_user_based:
-        user_row = df_users[df_users['Tên người dùng'] == st.session_state['logged_in_user']]
+        username = st.session_state['logged_in_user']
+        user_row = df_users[df_users['Tên người dùng'] == username]
+        
+        if user_row.empty: return # Thêm kiểm tra rỗng ở đây
+        
         user_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
         user_genres_list = []
         try:
@@ -671,6 +675,15 @@ def main_page(df_movies, cosine_sim):
     else:
         # --- LOGIC CHO NGƯỜI DÙNG ĐÃ ĐĂNG NHẬP ---
         df_users = st.session_state['df_users']
+        username = st.session_state['logged_in_user']
+        user_row = df_users[df_users['Tên người dùng'] == username]
+        
+        # Kiểm tra nếu user_row rỗng (có thể do lỗi tải data hoặc user mới bị mất)
+        if user_row.empty:
+            st.error("Lỗi: Không tìm thấy hồ sơ người dùng trong hệ thống. Vui lòng đăng nhập lại.")
+            st.session_state['logged_in_user'] = None
+            st.rerun()
+            return
         
         # CẬP NHẬT MENU SIDEBAR THEO YÊU CẦU
         menu_choice = st.sidebar.radio(
@@ -710,8 +723,6 @@ def main_page(df_movies, cosine_sim):
         elif menu_choice == 'Đề xuất theo AI':
             # CẬP NHẬT TIÊU ĐỀ
             st.header("2️⃣ Đề xuất theo AI")
-            username = st.session_state['logged_in_user']
-            user_row = df_users[df_users['Tên người dùng'] == username]
             
             # Logic TỰ ĐỘNG GỌI ĐỀ XUẤT NẾU LÀ ĐĂNG KÝ MỚI
             is_new_registration_with_results = (
@@ -746,13 +757,7 @@ def main_page(df_movies, cosine_sim):
             # --- LOGIC MỚI: HIỂN THỊ THỂ LOẠI VÀ CHẠY LẠI ĐỀ XUẤT ---
             st.header("3️⃣ Đề xuất theo Thể loại Yêu thích")
             
-            username = st.session_state['logged_in_user']
-            user_row = df_users[df_users['Tên người dùng'] == username]
-            
-            if user_row.empty:
-                st.error("Không tìm thấy hồ sơ người dùng.")
-                return
-
+            # Lấy dữ liệu an toàn
             recent_genres_str = user_row['5 phim coi gần nhất'].iloc[0]
             recent_genres = []
             try:
