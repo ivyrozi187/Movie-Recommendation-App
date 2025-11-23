@@ -600,7 +600,7 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
     fig, ax = plt.subplots(figsize=(10, 6))
 
     bars = ax.bar(top_7_genres['Thể loại'], top_7_genres['Độ phổ biến'], 
-                  color='skyblue', edgecolor='black', alpha=0.😎
+                  color='skyblue', edgecolor='black', alpha=0.8)
 
     ax.axhline(overall_avg_pop, color='red', linestyle='--', linewidth=1.5, 
                label=f'TB Tổng thể ({overall_avg_pop:.1f})')
@@ -716,7 +716,7 @@ def main_page(df_movies, cosine_sim):
                 selected_genre_list.extend(INTRO_TOPICS.get(topic, {}).get("genres", []))
             
             topic_names = ", ".join(selected_topics)
-            st.info(f"Đề xuất đang được cá nhân hóa dựa trên chủ đề bạn đã chọn: *{topic_names}*.")
+            st.info(f"Đề xuất đang được cá nhân hóa dựa trên chủ đề bạn đã chọn: **{topic_names}**.")
             
             # Tự động tìm kiếm nếu chưa có kết quả
             if st.session_state['last_guest_result'].empty:
@@ -856,7 +856,7 @@ def main_page(df_movies, cosine_sim):
 # V. CHẠY ỨNG DỤNG CHÍNH
 # ==============================================================================
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     # 1. Tải dữ liệu tĩnh (Chỉ chạy 1 lần)
     df_movies, cosine_sim = load_and_preprocess_static_data()
     
