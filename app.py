@@ -214,7 +214,7 @@ def login_as_guest():
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
     st.session_state['selected_intro_topics'] = [] 
     st.session_state['last_guest_result'] = pd.DataFrame() 
-    st.rerun()
+    
 
 def logout():
     st.session_state['logged_in_user'] = None
@@ -229,7 +229,7 @@ def logout():
 def select_topic(topic_key):
     st.session_state['selected_intro_topics'] = [topic_key]
     st.session_state['last_guest_result'] = pd.DataFrame()
-    st.rerun()
+    
 
 # --- CALLBACK CHO ĐĂNG KÝ (MỚI) ---
 def toggle_reg_topic(topic):
@@ -802,3 +802,4 @@ if __name__ == '__main__':
     else:
         # Truyền df_movies và cosine_sim vào authentication_page
         authentication_page(df_movies, cosine_sim)
+
