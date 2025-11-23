@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
-import sys # Đảm bảo lệnh này nằm trên dòng riêng biệt
+import sys 
 
 # --- CẤU HÌNH TÊN FILE ---
 USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
@@ -15,11 +15,22 @@ MOVIE_DATA_FILE = "movie_info_1000.csv"
 # --- CONSTANT ---
 GUEST_USER = "Guest_ZeroClick" # Định danh cho người dùng chế độ Khách
 
+# Bản đồ ánh xạ chủ đề hiển thị (như trong ảnh) sang thể loại (genres) và màu sắc (CSS)
+INTRO_TOPICS = {
+    "Marvel": {"genres": ["Action", "Sci-Fi", "Fantasy"], "color": "#7983e2", "gradient": "#5c67e2"},
+    "4K": {"genres": ["Action", "Adventure", "Sci-Fi"], "color": "#8d90a7", "gradient": "#7e8399"},
+    "Sitcom": {"genres": ["Comedy", "TV Movie"], "color": "#42b883", "gradient": "#35a371"},
+    "Lồng Tiếng Cực Mạnh": {"genres": ["Action", "Adventure", "Drama"], "color": "#a881e6", "gradient": "#9665d9"},
+    "Xuyên Không": {"genres": ["Sci-Fi", "Fantasy", "Adventure"], "color": "#e0a17f", "gradient": "#d18c69"},
+    "Cổ Trang": {"genres": ["History", "War", "Drama"], "color": "#b85c5c", "gradient": "#a54545"},
+}
+
 # --- KHỞI TẠO BIẾN TRẠNG THÁI (SESSION STATE) ---
 if 'logged_in_user' not in st.session_state:
     st.session_state['logged_in_user'] = None
 if 'auth_mode' not in st.session_state:
     st.session_state['auth_mode'] = 'login'
+
 # Khởi tạo các biến để lưu kết quả và trạng thái hiển thị biểu đồ
 if 'last_sim_result' not in st.session_state: st.session_state['last_sim_result'] = pd.DataFrame()
 if 'last_sim_movie' not in st.session_state: st.session_state['last_sim_movie'] = None
@@ -27,6 +38,11 @@ if 'show_sim_plot' not in st.session_state: st.session_state['show_sim_plot'] = 
 
 if 'last_profile_recommendations' not in st.session_state: st.session_state['last_profile_recommendations'] = pd.DataFrame()
 if 'show_profile_plot' not in st.session_state: st.session_state['show_profile_plot'] = False
+
+# Biến trạng thái mới cho chức năng Zero-Click với Card
+if 'selected_intro_topics' not in st.session_state: st.session_state['selected_intro_topics'] = []
+if 'last_guest_result' not in st.session_state: st.session_state['last_guest_result'] = pd.DataFrame()
+if 'show_guest_plot' not in st.session_state: st.session_state['show_guest_plot'] = False
 
 
 # ==============================================================================
@@ -45,7 +61,7 @@ def parse_genres(genre_string):
     genres = [g.strip().replace('"', '') for g in genre_string.split(',')]
     return set(genres)
     
-@st.cache_resource # Chỉ tải dữ liệu tĩnh một lần
+@st.cache_resource 
 def load_and_preprocess_static_data():
     """Tải và tiền xử lý dữ liệu tĩnh (movies và mô hình)."""
     try:
@@ -108,10 +124,9 @@ def load_and_preprocess_static_data():
             lambda x: max([normalized_genre_pop.get(g.strip(), 0) for g in x.split(',')], default=0) if x else 0
         )
 
-        return df_movies, cosine_sim_matrix # Trả về df_movies và cosine_sim_matrix
+        return df_movies, cosine_sim_matrix 
 
     except Exception as e:
-        # Thay vì st.stop(), in lỗi và trả về DataFrame/Matrix trống để tránh lỗi "is not defined"
         st.error(f"LỖI TẢI HOẶC XỬ LÝ DỮ LIỆU TĨNH: {e}. Vui lòng kiểm tra các file CSV.")
         return pd.DataFrame(), np.array([[]])
 
@@ -154,6 +169,8 @@ def login_as_guest():
     st.session_state['auth_mode'] = 'login' 
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
+    st.session_state['selected_intro_topics'] = [] # Reset topic selection
+    st.session_state['last_guest_result'] = pd.DataFrame() # Reset results
     st.rerun() # Chạy lại để chuyển sang main_page
 
 def logout():
@@ -162,13 +179,22 @@ def logout():
     st.session_state['auth_mode'] = 'login'
     st.session_state['last_sim_result'] = pd.DataFrame()
     st.session_state['last_profile_recommendations'] = pd.DataFrame()
+    st.session_state['selected_intro_topics'] = [] # Reset topic selection
+    st.session_state['last_guest_result'] = pd.DataFrame() # Reset results
+
+# Hàm callback khi bấm vào thẻ chủ đề
+def select_topic(topic_key):
+    """Lưu chủ đề đã chọn và kích hoạt tìm kiếm."""
+    st.session_state['selected_intro_topics'] = [topic_key]
+    st.session_state['last_guest_result'] = pd.DataFrame() # Xóa kết quả cũ
+    st.rerun()
 # ---------------------------
 
 def register_new_user_form(df_movies):
     """Form đăng ký người dùng mới (Lưu vào bộ nhớ Streamlit)."""
     st.header("📝 Đăng Ký Tài Khoản Mới (Phiên Tạm Thời)")
     st.info("📢 Người dùng mới sẽ chỉ tồn tại trong phiên làm việc hiện tại của bạn.")
-
+    
     df_users = st.session_state['df_users']
     movie_titles_list = get_unique_movie_titles(df_movies)
 
@@ -253,9 +279,9 @@ def authentication_page(df_movies):
 
     st.write("---")
     st.subheader("Hoặc:")
-    # Nút cho chế độ Khách
+    # Thay đổi nút Guest để sử dụng callback
     st.button("🚀 Thử Dùng Với Chế Độ Khách (Zero-Click)", key="btn_guest", on_click=login_as_guest)
-    st.caption("Đây là đề xuất chung, không cá nhân hóa, dựa trên xu hướng toàn cầu.")
+    st.caption("Bạn sẽ được chuyển đến trang chọn sở thích để nhận đề xuất chung ban đầu.")
 
     if st.session_state['auth_mode'] == 'login':
         login_form()
@@ -267,32 +293,44 @@ def authentication_page(df_movies):
 # III. CHỨC NĂNG ĐỀ XUẤT & VẼ BIỂU ĐỒ
 # ==============================================================================
 
-def get_zero_click_recommendations(df_movies, num_recommendations=15):
+def get_zero_click_recommendations(df_movies, selected_genres, num_recommendations=15):
     """
-    Đề xuất 'Zero-Click' dựa trên các yếu tố toàn cầu (Popularity, Recency, Global Genre Pop).
-    Thực hiện 5 tiêu chí bạn yêu cầu theo trọng số:
-    1. Top phim rate/trending/siêu nổi tiếng -> Dùng 'popularity_norm' (Trọng số 50%)
-    2. Top phim theo thể loại phổ biến -> Dùng 'global_genre_score' (Trọng số 25%)
-    3. Top phim mới ra mắt -> Dùng 'recency_score' (Trọng số 25%)
+    Đề xuất 'Zero-Click' có cá nhân hóa dựa trên thể loại đã chọn (selected_genres)
     """
     
-    # Đặt trọng số cho các tiêu chí
+    # Đặt trọng số cơ bản
     WEIGHT_POPULARITY = 0.50 
     WEIGHT_RECENCY = 0.25
     WEIGHT_GENRE_POPULARITY = 0.25
+    WEIGHT_TOPIC_BOOST = 0.50 # Trọng số điểm boost dựa trên lựa chọn chủ đề
     
-    # Kiểm tra DataFrame rỗng
     if df_movies.empty or 'popularity_norm' not in df_movies.columns:
         return pd.DataFrame()
-        
-    # Tính điểm tổng hợp Zero-Click
-    df_movies['combined_zero_click_score'] = (
-        WEIGHT_POPULARITY * df_movies['popularity_norm'] +
-        WEIGHT_RECENCY * df_movies['recency_score'] +
-        WEIGHT_GENRE_POPULARITY * df_movies['global_genre_score']
+    
+    df = df_movies.copy()
+    
+    # 1. Tính điểm Zero-Click cơ bản
+    df['base_zero_click_score'] = (
+        WEIGHT_POPULARITY * df['popularity_norm'] +
+        WEIGHT_RECENCY * df['recency_score'] +
+        WEIGHT_GENRE_POPULARITY * df['global_genre_score']
     )
     
-    recommended_df = df_movies.sort_values(
+    # 2. Áp dụng điểm BOOST từ lựa chọn thẻ
+    if selected_genres:
+        # Tạo hàm tính điểm boost (điểm 1 nếu phim có chứa bất kỳ genre nào đã chọn)
+        def calculate_boost(parsed_genres):
+            return 1 if not parsed_genres.isdisjoint(set(selected_genres)) else 0
+        
+        df['topic_boost'] = df['parsed_genres'].apply(calculate_boost)
+        
+        # Điểm tổng cuối cùng: Base Score + (Boost Score * Trọng số Boost)
+        df['combined_zero_click_score'] = df['base_zero_click_score'] + (df['topic_boost'] * WEIGHT_TOPIC_BOOST)
+    else:
+        # Nếu không chọn gì, chỉ dùng Base Score
+        df['combined_zero_click_score'] = df['base_zero_click_score']
+
+    recommended_df = df.sort_values(
         by='combined_zero_click_score',
         ascending=False
     )
@@ -302,6 +340,7 @@ def get_zero_click_recommendations(df_movies, num_recommendations=15):
 
 def get_recommendations(username, df_movies, num_recommendations=10):
     """Đề xuất phim dựa trên 5 phim người dùng xem gần nhất và sở thích thể loại."""
+    
     df_users = st.session_state['df_users']
     user_row = df_users[df_users['Tên người dùng'] == username]
     if user_row.empty: return pd.DataFrame()
@@ -354,7 +393,6 @@ def get_movie_index(movie_name, df_movies):
 def recommend_movies_smart(movie_name, weight_sim, weight_pop, df_movies, cosine_sim):
     """Đề xuất phim dựa trên sự kết hợp giữa độ giống (sim) và độ phổ biến (pop)."""
     
-    # Kiểm tra cosine_sim
     if cosine_sim.size == 0 or df_movies.empty:
         st.warning("Dữ liệu phim chưa được tải hoặc bị lỗi. Không thể thực hiện đề xuất.")
         return pd.DataFrame()
@@ -458,6 +496,71 @@ def plot_genre_popularity(movie_name, recommended_movies_df, df_movies, is_user_
 # IV. GIAO DIỆN CHÍNH (MAIN PAGE)
 # ==============================================================================
 
+def draw_interest_cards():
+    """Vẽ giao diện chọn thẻ chủ đề."""
+    st.header("Bạn đang quan tâm gì?")
+    st.markdown("Chọn một hoặc nhiều chủ đề để nhận đề xuất ban đầu được cá nhân hóa:", unsafe_allow_html=True)
+    
+    # CSS để tạo kiểu thẻ
+    st.markdown("""
+    <style>
+        .interest-card {
+            border-radius: 15px;
+            color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .interest-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+        .interest-card h3 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .interest-card .details {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    topics = list(INTRO_TOPICS.keys())
+    
+    # Tạo layout 3 cột, lặp lại cho các chủ đề
+    cols = st.columns(3)
+    
+    for i, topic in enumerate(topics):
+        data = INTRO_TOPICS[topic]
+        
+        # HTML cho mỗi thẻ (sử dụng background gradient và nút ẩn)
+        card_html = f"""
+        <div class="interest-card" style="background: linear-gradient(135deg, {data['color']}, {data['gradient']});">
+            <h3>{topic}</h3>
+            <div class="details">Xem chủ đề ></div>
+        </div>
+        """
+        
+        # Sử dụng st.button để tạo sự kiện click
+        # Đặt button trên st.markdown để nó thực sự kích hoạt Streamlit Rerun
+        with cols[i % 3]:
+            # Hiển thị thẻ bằng HTML
+            st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Tạo nút ẩn (zero-height/opacity) để bắt sự kiện click
+            if st.button(f"Chọn {topic}", key=f"select_{topic}", use_container_width=True):
+                select_topic(topic)
+
+
 def main_page(df_movies, cosine_sim):
     
     is_guest = st.session_state['logged_in_user'] == GUEST_USER
@@ -470,45 +573,56 @@ def main_page(df_movies, cosine_sim):
     if is_guest:
         # --- CHẾ ĐỘ KHÁCH (ZERO-CLICK) ---
         st.header("🔥 Đề xuất Zero-Click (Dựa trên Xu hướng Toàn cầu)")
-        st.caption("Đây là đề xuất không cá nhân hóa, dựa trên sự kết hợp của Độ phổ biến, Độ mới và Thể loại phổ biến toàn hệ thống.")
+
+        # 1. BƯỚC LỰA CHỌN CHỦ ĐỀ (Hiển thị nếu chưa chọn)
+        if not st.session_state['selected_intro_topics']:
+            draw_interest_cards()
+            
+            # Luôn có nút Đăng xuất cho Guest
+            if st.sidebar.button("Đăng Xuất Khách", key="logout_guest_btn", on_click=logout):
+                pass
+            
+            return # Dừng ở đây để chờ người dùng chọn
         
-        # Thêm biến state để lưu kết quả Zero-Click và trạng thái plot
-        if 'last_guest_result' not in st.session_state: st.session_state['last_guest_result'] = pd.DataFrame()
-        if 'show_guest_plot' not in st.session_state: st.session_state['show_guest_plot'] = False
-        
-        if st.button("Tìm Đề Xuất Zero-Click", key="find_guest_rec"):
-            zero_click_results = get_zero_click_recommendations(df_movies, num_recommendations=15)
+        # 2. BƯỚC HIỂN THỊ KẾT QUẢ (Nếu đã chọn chủ đề)
+        else:
+            selected_topics = st.session_state['selected_intro_topics']
+            selected_genre_list = []
+            for topic in selected_topics:
+                selected_genre_list.extend(INTRO_TOPICS.get(topic, {}).get("genres", []))
             
-            if not zero_click_results.empty:
-                st.session_state['last_guest_result'] = zero_click_results
-                st.session_state['show_guest_plot'] = True
-            else:
-                st.session_state['last_guest_result'] = pd.DataFrame()
-                st.session_state['show_guest_plot'] = False
-                st.warning("⚠️ Không thể tạo đề xuất Zero-Click. Vui lòng kiểm tra dữ liệu.")
-            st.rerun() # Chạy lại để hiển thị kết quả
+            topic_names = ", ".join(selected_topics)
+            st.info(f"Đề xuất đang được cá nhân hóa dựa trên chủ đề bạn đã chọn: **{topic_names}**.")
             
-        # Hiển thị kết quả và biểu đồ
-        if not st.session_state['last_guest_result'].empty:
-            zero_click_results = st.session_state['last_guest_result']
-            st.subheader("✅ 15 Đề xuất Giới thiệu Tốt nhất:")
-            st.dataframe(zero_click_results, use_container_width=True)
+            # Tự động tìm kiếm nếu chưa có kết quả
+            if st.session_state['last_guest_result'].empty:
+                zero_click_results = get_zero_click_recommendations(df_movies, selected_genre_list, num_recommendations=15)
+                
+                if not zero_click_results.empty:
+                    st.session_state['last_guest_result'] = zero_click_results
+                    st.session_state['show_guest_plot'] = True
+                else:
+                    st.session_state['last_guest_result'] = pd.DataFrame()
+                    st.session_state['show_guest_plot'] = False
+                    st.warning("⚠️ Không thể tạo đề xuất Zero-Click. Vui lòng kiểm tra dữ liệu.")
             
-            show_plot_guest = st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", 
-                                            value=st.session_state['show_guest_plot'],
-                                            key="plot_guest_check")
+            # Hiển thị kết quả và biểu đồ
+            if not st.session_state['last_guest_result'].empty:
+                zero_click_results = st.session_state['last_guest_result']
+                st.subheader("✅ 15 Đề xuất Giới thiệu Tốt nhất Dành Cho Bạn:")
+                st.dataframe(zero_click_results, use_container_width=True)
+                
+                show_plot_guest = st.checkbox("📊 Hiển thị Biểu đồ so sánh Thể loại", 
+                                                value=st.session_state['show_guest_plot'],
+                                                key="plot_guest_check")
+                
+                if show_plot_guest:
+                    recommended_movies_info = df_movies[df_movies['Tên phim'].isin(zero_click_results['Tên phim'].tolist())]
+                    plot_genre_popularity(None, recommended_movies_info, df_movies, is_user_based=False)
             
-            if show_plot_guest:
-                recommended_movies_info = df_movies[df_movies['Tên phim'].isin(zero_click_results['Tên phim'].tolist())]
-                # Gọi hàm vẽ đồ thị, truyền is_user_based=False và movie_name=None để báo hiệu đây là chế độ Guest
-                plot_genre_popularity(None, 
-                                      recommended_movies_info, 
-                                      df_movies, 
-                                      is_user_based=False)
-        
-        # Luôn có nút Đăng xuất cho Guest
-        if st.sidebar.button("Đăng Xuất Khách", key="logout_guest_btn", on_click=logout):
-            pass
+            # Nút Đăng xuất ở sidebar
+            if st.sidebar.button("Đăng Xuất Khách", key="logout_guest_btn", on_click=logout):
+                pass
 
     else:
         # --- CHẾ ĐỘ NGƯỜI DÙNG ĐĂNG NHẬP ---
