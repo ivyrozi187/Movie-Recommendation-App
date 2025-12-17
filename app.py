@@ -1,96 +1,85 @@
 import streamlit as st
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 
-# ===================== CONFIG =====================
-st.set_page_config(
-    page_title="Netflix Movie Recommender",
-    layout="wide"
-)
+st.set_page_config(page_title="MovieFlix", layout="wide")
 
 # ===================== LOAD DATA =====================
-movies_df = pd.read_csv("movie_info_1000.csv")
-users_df = pd.read_csv("user_dataset_with_posters.csv")
+@st.cache_data
+def load_data():
+    df = pd.read_csv("user_dataset_ready.csv")
+    return df
 
-# ===================== CUSTOM CSS =====================
+users_df = load_data()
+
+# ========== NAVBAR ==========
 st.markdown("""
 <style>
-body {
+.navbar {
     background-color: #141414;
-    color: white;
+    padding: 15px;
 }
-h1, h2, h3 {
-    color: white;
-}
-.poster img {
-    border-radius: 12px;
-}
-[data-testid="stImage"] {
-    transition: transform .2s;
-}
-[data-testid="stImage"]:hover {
-    transform: scale(1.05);
+.navbar h1 {
+    color: #E50914;
+    margin: 0;
+    font-size: 30px;
 }
 </style>
+<div class="navbar">
+    <h1>MovieFlix</h1>
+</div>
 """, unsafe_allow_html=True)
 
-# ===================== SIDEBAR =====================
-st.sidebar.title("🎥 Netflix Recommender")
-user_id = st.sidebar.selectbox(
-    "Chọn người dùng",
-    users_df["user_id"]
-)
-
+# ========== SELECT USER ==========
+user_id = st.selectbox("Chọn người dùng", users_df["user_id"])
 user = users_df[users_df["user_id"] == user_id].iloc[0]
 
-# ===================== HEADER =====================
-st.title("🍿 Netflix-style Movie Recommendation")
-st.subheader(f"Xin chào, **{user['username']}** 👋")
+# ========== HERO BANNER ==========
+st.markdown("""
+<style>
+.hero {
+    background-image: url('https://images.unsplash.com/photo-1606761560503-b7a8e4f0f4d6');
+    background-size: cover;
+    background-position: center;
+    height: 350px;
+    border-radius: 8px;
+}
+.hero h2 {
+    color: white;
+    padding: 150px 30px;
+    font-size: 48px;
+    text-shadow: 2px 2px 6px black;
+}
+</style>
+<div class="hero">
+    <h2>Đề xuất cho bạn</h2>
+</div>
+""", unsafe_allow_html=True)
 
-# ===================== RECENT WATCHED =====================
-st.markdown("## 🎬 Phim bạn xem gần nhất")
+# ========== MOVIE ROW ==========
+def movie_row(title, movie_list, image_list):
+    st.markdown(f"### {title}")
+    cols = st.columns(len(movie_list))
+    for col, m, img in zip(cols, movie_list, image_list):
+        with col:
+            st.image(img, use_container_width=True)
+            st.write(m)
 
+# ========== RECENTLY WATCHED ==========
 recent_movies = user["recent_movies"].split("|")
-recent_posters = user["recent_posters"].split("|")
+recent_images = user["recent_images"].split("|")
+movie_row("Phim đã xem gần nhất", recent_movies, recent_images)
 
-cols = st.columns(5)
-for col, title, poster in zip(cols, recent_movies, recent_posters):
-    with col:
-        st.image(poster, use_container_width=True)
-        st.caption(title)
+# ========== FAVORITE ==========
+st.markdown("### Phim yêu thích")
+st.image(user["favorite_image"], width=240)
+st.write(user["favorite_movie"])
 
-# ===================== FAVORITE =====================
-st.markdown("## ❤️ Phim yêu thích nhất")
-st.image(user["favorite_poster"], width=260)
-st.write(f"**{user['favorite_movie']}**")
+# ========== SIMPLE RECOMMENDATIONS ==========
+other = users_df[users_df["user_id"] != user_id].sample(5).iloc[0]
+rec_movies = other["recent_movies"].split("|")
+rec_images = other["recent_images"].split("|")
+movie_row("Gợi ý cho bạn", rec_movies, rec_images)
 
-# ===================== SIMPLE CONTENT-BASED RECOMMENDATION =====================
-st.markdown("## ⭐ Gợi ý dành cho bạn")
-
-# Lấy thể loại phim yêu thích
-fav_movie = user["favorite_movie"]
-fav_genre = movies_df[movies_df["Tên phim"] == fav_movie]["Thể loại phim"]
-
-if not fav_genre.empty:
-    fav_genre = fav_genre.values[0]
-    recommended = movies_df[
-        movies_df["Thể loại phim"].str.contains(fav_genre.split(",")[0], na=False)
-    ].sample(5)
-else:
-    recommended = movies_df.sample(5)
-
-rec_cols = st.columns(5)
-
-for col, (_, row) in zip(rec_cols, recommended.iterrows()):
-    with col:
-        st.image(
-            f"https://image.tmdb.org/t/p/w500",  # placeholder nếu bạn muốn fetch thêm
-            use_container_width=True
-        )
-        st.caption(row["Tên phim"])
-
-# ===================== FOOTER =====================
+# ========== END ==========
 st.markdown("---")
-st.markdown("🎓 **BTL – Hệ thống gợi ý phim | Streamlit + TMDb API**")
-
+st.write("🚀 Ứng dụng gợi ý phim tích hợp phong cách Netflix")
