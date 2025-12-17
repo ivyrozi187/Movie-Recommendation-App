@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 from collections import Counter
 
 # ==============================================================================
-# 1. CẤU HÌNH TRANG & CSS
+# 1. CẤU HÌNH TRANG
 # ==============================================================================
 st.set_page_config(
     page_title="Movie RecSys AI",
@@ -56,6 +56,7 @@ def load_and_process_data():
     tfidf_matrix = tfidf.fit_transform(movies['combined_features'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
+    # 🔒 CHỈ LẤY 5 PHIM GẦN NHẤT
     users['history_list'] = users['5 phim coi gần nhất'].apply(
         lambda x: ast.literal_eval(x)[:5] if isinstance(x, str) else []
     )
@@ -70,27 +71,27 @@ def load_and_process_data():
 movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 
 # ==============================================================================
-# 3. HÀM BIỂU ĐỒ CÁ NHÂN (ĐÃ SỬA – CHỈ LẤY 5 PHIM ĐÃ XEM)
+# 3. BIỂU ĐỒ THỐNG KÊ CÁ NHÂN (CHỈ 5 PHIM ĐÃ XEM)
 # ==============================================================================
 def draw_user_charts(history_titles):
     """
-    Vẽ biểu đồ xu hướng xem phim
-    CHỈ dựa trên 5 phim đã xem gần nhất
+    Biểu đồ xu hướng xem phim cá nhân
+    DỮ LIỆU = 5 PHIM ĐÃ XEM GẦN NHẤT
     """
 
-    # Đảm bảo chỉ lấy đúng 5 phim
     history_titles = history_titles[:5]
 
     if not history_titles:
-        st.warning("Chưa có dữ liệu lịch sử xem phim.")
+        st.warning("Người dùng chưa có lịch sử xem phim.")
         return
 
     genres = []
     for title in history_titles:
         row = movies_df[movies_df['Tên phim'] == title]
         if not row.empty:
-            g_list = [x.strip() for x in row.iloc[0]['Thể loại phim'].split(',')]
-            genres.extend(g_list)
+            genres.extend(
+                [g.strip() for g in row.iloc[0]['Thể loại phim'].split(',')]
+            )
 
     if not genres:
         st.warning("Không đủ dữ liệu thể loại để vẽ biểu đồ.")
@@ -141,12 +142,10 @@ with st.sidebar:
     st.title("🎬 DreamStream")
 
     if st.session_state.user_mode == 'member':
-        menu = st.radio("Chức năng", [
-            "Đề xuất AI",
-            "Tìm kiếm Phim",
-            "Theo Thể loại Yêu thích",
-            "Thống kê Cá nhân"
-        ])
+        menu = st.radio(
+            "Chức năng",
+            ["Đề xuất AI", "Tìm kiếm Phim", "Theo Thể loại Yêu thích", "Thống kê Cá nhân"]
+        )
         if st.button("Đăng xuất"):
             st.session_state.clear()
             st.rerun()
@@ -187,7 +186,7 @@ if st.session_state.user_mode is None:
 # 7. MEMBER – THỐNG KÊ CÁ NHÂN
 # ==============================================================================
 elif st.session_state.user_mode == 'member':
-    user_history = st.session_state.current_user['history_list']
+    user_history = st.session_state.current_user.get('history_list', [])
 
     if menu == "Thống kê Cá nhân":
         st.header("📊 Xu hướng Xem phim Cá nhân")
