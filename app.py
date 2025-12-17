@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import ast
 import random
+import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -99,6 +100,27 @@ def show_movies(df):
                 st.rerun()
 
 # ======================================================
+# PLOT CHART
+# ======================================================
+def plot_recommendation_bar(df, title="So sánh Đề xuất Phim"):
+    if df is None or df.empty:
+        return
+
+    plot_df = df.head(10).copy()
+    plot_df["score"] = range(1, len(plot_df) + 1)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.barh(plot_df["Tên phim"], plot_df["score"], color="#f4a7b9")
+    ax.set_title(title)
+    ax.set_xlabel("Điểm đề xuất")
+    ax.invert_yaxis()
+
+    for i, v in enumerate(plot_df["score"]):
+        ax.text(v + 0.05, i, f"{v:.2f}", va="center")
+
+    st.pyplot(fig)
+
+# ======================================================
 # RECOMMEND FUNCTIONS
 # ======================================================
 def content_based(movie_name, top_n=10):
@@ -133,17 +155,13 @@ if st.session_state.logged_in_user is None:
     st.title("🍿 DreamStream: Đề xuất Phim Cá nhân")
     tab1, tab2, tab3 = st.tabs(["Đăng Nhập", "Đăng Ký", "Chế Độ Khách"])
 
-    # LOGIN
     with tab1:
         u = st.text_input("Tên người dùng")
         if st.button("Đăng nhập"):
             if u in users_df["Tên người dùng"].values:
                 st.session_state.logged_in_user = u
                 st.rerun()
-            else:
-                st.error("❌ Không tồn tại")
 
-    # REGISTER
     with tab2:
         new = st.text_input("Tên người dùng mới")
         g = st.multiselect("Chọn thể loại bạn thích:", ALL_GENRES)
@@ -154,18 +172,15 @@ if st.session_state.logged_in_user is None:
                 st.session_state.is_new_user = True
                 st.rerun()
 
-    # GUEST
     with tab3:
         st.session_state.guest_genres = st.multiselect(
-            "Chọn thể loại bạn muốn xem:",
+            "Chọn thể loại muốn xem:",
             ALL_GENRES
         )
         if st.button("Truy cập với tư cách Khách"):
             if len(st.session_state.guest_genres) >= 1:
                 st.session_state.logged_in_user = "GUEST"
                 st.rerun()
-            else:
-                st.warning("⚠️ Chọn ít nhất 1 thể loại")
 
     st.stop()
 
@@ -206,15 +221,14 @@ if menu == "Đăng Xuất":
 # ======================================================
 st.header(f"🎬 Chào mừng, {st.session_state.logged_in_user}")
 
-# USER MỚI → CHỌN LẠI GENRE + ĐỀ XUẤT
+# USER MỚI
 if st.session_state.is_new_user:
     st.subheader("🎯 Chọn lại thể loại & Đề xuất")
     st.session_state.user_genres = st.multiselect(
-        "Thể loại bạn muốn xem:",
+        "Thể loại muốn xem:",
         ALL_GENRES,
         default=st.session_state.user_genres
     )
-
     if st.button("🎬 Đề xuất phim"):
         st.session_state.last_results = recommend_by_genres(
             st.session_state.user_genres
@@ -226,7 +240,7 @@ elif menu == "Đề xuất theo Tên Phim":
     if st.button("Tìm"):
         st.session_state.last_results = content_based(movie)
 
-# AI (CÓ REFRESH)
+# AI + REFRESH
 elif menu == "Đề xuất theo AI":
     if st.button("🎬 Đề xuất AI"):
         if st.session_state.logged_in_user == "GUEST":
@@ -246,7 +260,7 @@ elif menu == "Đề xuất theo AI":
             user = users_df[users_df["Tên người dùng"] == st.session_state.logged_in_user].iloc[0]
             st.session_state.last_results = profile_based(user)
 
-# FAVORITE GENRE + REFRESH
+# FAVORITE GENRE
 elif menu == "Đề xuất theo Thể loại Yêu thích":
     if st.session_state.logged_in_user == "GUEST":
         st.session_state.last_results = recommend_by_genres(
@@ -267,8 +281,14 @@ elif menu == "Đề xuất theo Thể loại Yêu thích":
             st.session_state.last_results = recommend_by_genres(g)
 
 # ======================================================
-# SHOW
+# SHOW + CHART
 # ======================================================
 if st.session_state.last_results is not None:
     st.markdown("---")
     show_movies(st.session_state.last_results)
+
+    if st.checkbox("📊 Hiển thị Biểu đồ"):
+        plot_recommendation_bar(
+            st.session_state.last_results,
+            title="So sánh Đề xuất Phim"
+        )
