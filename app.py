@@ -6,13 +6,14 @@ from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ================= CONFIG =================
-st.set_page_config(
-    page_title="DreamStream",
-    layout="wide"
-)
+# ======================================================
+# CONFIG
+# ======================================================
+st.set_page_config(page_title="DreamStream", layout="wide")
 
-# ================= LOAD DATA =================
+# ======================================================
+# LOAD DATA
+# ======================================================
 @st.cache_data
 def load_movies():
     return pd.read_csv("data_phim_full_images.csv").fillna("")
@@ -24,7 +25,9 @@ def load_users():
 movies_df = load_movies()
 users_df = load_users()
 
-# ================= PREPROCESS =================
+# ======================================================
+# PREPROCESS
+# ======================================================
 def safe_col(df, col):
     return df[col].astype(str) if col in df.columns else ""
 
@@ -38,17 +41,23 @@ tfidf = TfidfVectorizer(stop_words="english")
 tfidf_matrix = tfidf.fit_transform(movies_df["content"])
 cosine_sim = cosine_similarity(tfidf_matrix)
 
-# ================= SESSION =================
-if "logged_in_user" not in st.session_state:
-    st.session_state.logged_in_user = None
-if "selected_movie" not in st.session_state:
-    st.session_state.selected_movie = None
-if "last_results" not in st.session_state:
-    st.session_state.last_results = None
-if "guest_genres" not in st.session_state:
-    st.session_state.guest_genres = []
+# ======================================================
+# SESSION STATE (ĐÚNG KIỂU)
+# ======================================================
+defaults = {
+    "logged_in_user": None,
+    "selected_movie": None,
+    "last_results": None,
+    "guest_genres": [],
+    "is_new_user": False
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-# ================= UTILS =================
+# ======================================================
+# UTILS
+# ======================================================
 def get_all_genres():
     s = set()
     for g in movies_df["Thể loại phim"]:
@@ -59,12 +68,12 @@ def get_all_genres():
 ALL_GENRES = get_all_genres()
 
 def get_poster(row):
-    if "Link Poster" in row and row["Link Poster"].startswith("http"):
+    if "Link Poster" in row and str(row["Link Poster"]).startswith("http"):
         return row["Link Poster"]
     return "https://via.placeholder.com/300x450?text=No+Image"
 
 def show_movies(df):
-    if df.empty:
+    if df is None or df.empty:
         st.info("Không có phim để hiển thị")
         return
     cols = st.columns(5)
@@ -72,12 +81,14 @@ def show_movies(df):
         with cols[i % 5]:
             st.image(get_poster(row), use_container_width=True)
             st.caption(row["Tên phim"])
-            if st.button("🎬 Xem chi tiết", key=f"detail_{i}_{row['Tên phim']}"):
+            if st.button("🎬 Xem chi tiết", key=f"{row['Tên phim']}_{i}"):
                 st.session_state.selected_movie = row["Tên phim"]
                 st.rerun()
 
-# ================= RECOMMEND =================
-def content_based(title, top_n=5):
+# ======================================================
+# RECOMMEND LOGIC
+# ======================================================
+def content_based(title, top_n=10):
     if title not in movies_df["Tên phim"].values:
         return movies_df.sample(top_n)
     idx = movies_df[movies_df["Tên phim"] == title].index[0]
@@ -86,6 +97,8 @@ def content_based(title, top_n=5):
     return movies_df.iloc[[i[0] for i in scores]]
 
 def recommend_by_genres(genres, top_n=10):
+    if not genres:
+        return movies_df.sample(top_n)
     df = movies_df[movies_df["Thể loại phim"].apply(
         lambda x: any(g in x for g in genres)
     )]
@@ -106,84 +119,73 @@ def profile_based(user_row, top_n=10):
         return movies_df.sample(top_n)
 
     main = genres.str.split(",").explode().value_counts().idxmax()
-    return movies_df[movies_df["Thể loại phim"].str.contains(main)].sample(top_n)
+    return movies_df[movies_df["Thể loại phim"].str.contains(main, na=False)].sample(top_n)
 
-# ================= CHART =================
-def plot_genre_chart_from_df(df, title):
-    genres = []
-    for _, row in df.iterrows():
-        genres.extend(row["Thể loại phim"].split(","))
-
-    if not genres:
-        st.info("Không đủ dữ liệu để vẽ biểu đồ")
-        return
-
-    counter = Counter([g.strip() for g in genres])
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.bar(counter.keys(), counter.values())
-    ax.set_title(title)
-    plt.xticks(rotation=45, ha="right")
-    st.pyplot(fig)
-
-# ================= LOGIN =================
+# ======================================================
+# LOGIN
+# ======================================================
 if st.session_state.logged_in_user is None:
     st.title("🍿 DreamStream")
     tab1, tab2, tab3 = st.tabs(["Đăng nhập", "Đăng ký", "Khách"])
 
     with tab1:
         u = st.text_input("Tên người dùng")
-        if st.button("Đăng nhập"):
-            if u in users_df["Tên người dùng"].values:
-                st.session_state.logged_in_user = u
-                st.rerun()
+        if st.button("Đăng nhập") and u in users_df["Tên người dùng"].values:
+            st.session_state.logged_in_user = u
+            st.rerun()
 
     with tab2:
         new = st.text_input("Tên người dùng mới")
-        fav = st.multiselect("Chọn thể loại yêu thích", ALL_GENRES)
-        if st.button("Hoàn tất"):
-            if new:
-                st.session_state.logged_in_user = new
-                st.session_state.guest_genres = fav
-                st.rerun()
+        g = st.multiselect("Thể loại yêu thích", ALL_GENRES)
+        if st.button("Hoàn tất") and new:
+            st.session_state.logged_in_user = new
+            st.session_state.guest_genres = g
+            st.session_state.is_new_user = True
+            st.rerun()
 
     with tab3:
-        g = st.multiselect("Chọn thể loại muốn xem", ALL_GENRES)
-        if st.button("Vào chế độ khách"):
+        g = st.multiselect("Chọn thể loại xem", ALL_GENRES)
+        if st.button("Vào chế độ Khách"):
             st.session_state.logged_in_user = "GUEST"
             st.session_state.guest_genres = g
             st.rerun()
 
     st.stop()
 
-# ================= DETAIL =================
+# ======================================================
+# DETAIL
+# ======================================================
 if st.session_state.selected_movie:
     m = movies_df[movies_df["Tên phim"] == st.session_state.selected_movie].iloc[0]
     st.image(get_poster(m), use_container_width=True)
     st.title(m["Tên phim"])
     st.write("🎭", m["Thể loại phim"])
-    st.subheader("🎯 Phim tương tự")
-    show_movies(content_based(m["Tên phim"]))
+    show_movies(content_based(m["Tên phim"], 5))
     if st.button("⬅️ Quay lại"):
         st.session_state.selected_movie = None
         st.rerun()
     st.stop()
 
-# ================= MENU =================
+# ======================================================
+# MENU
+# ======================================================
 menu = st.sidebar.radio(
     "Menu",
-    ["Cá nhân", "Tìm phim", "Đề xuất AI", "Đề xuất theo Thể loại", "Đăng xuất"]
+    ["Cá nhân", "Đề xuất theo Tên Phim", "Đề xuất theo AI", "Đề xuất theo Thể loại", "Đăng xuất"]
 )
 
 if menu == "Đăng xuất":
     st.session_state.clear()
     st.rerun()
 
-st.header(f"🎬 Xin chào {st.session_state.logged_in_user}")
+st.session_state.last_results = None
 
-# ================= PERSONAL =================
+# ======================================================
+# SCREENS
+# ======================================================
 if menu == "Cá nhân":
     if st.session_state.logged_in_user == "GUEST":
-        st.info("Chế độ khách không có trang cá nhân")
+        st.info("Khách không có trang cá nhân")
     else:
         user = users_df[users_df["Tên người dùng"] == st.session_state.logged_in_user].iloc[0]
         try:
@@ -192,41 +194,25 @@ if menu == "Cá nhân":
             recent = []
         show_movies(movies_df[movies_df["Tên phim"].isin(recent)])
 
-# ================= SEARCH =================
-elif menu == "Tìm phim":
-    key = st.text_input("Nhập chính xác tên phim")
-    if key:
-        df = movies_df[movies_df["Tên phim"].str.lower() == key.lower()]
-        show_movies(df)
+elif menu == "Đề xuất theo Tên Phim":
+    movie = st.selectbox("Chọn phim", movies_df["Tên phim"])
+    if st.button("Đề xuất"):
+        st.session_state.last_results = content_based(movie)
 
-# ================= AI =================
-elif menu == "Đề xuất AI":
-    show_chart = st.checkbox("📊 Hiển thị biểu đồ")
-
-    if st.button("🎬 Đề xuất"):
+elif menu == "Đề xuất theo AI":
+    if st.button("Đề xuất AI"):
         if st.session_state.logged_in_user == "GUEST":
             st.session_state.last_results = recommend_by_genres(st.session_state.guest_genres)
         else:
             user = users_df[users_df["Tên người dùng"] == st.session_state.logged_in_user].iloc[0]
             st.session_state.last_results = profile_based(user)
 
-    if st.session_state.last_results is not None:
-        show_movies(st.session_state.last_results)
-        if show_chart:
-            plot_genre_chart_from_df(
-                st.session_state.last_results,
-                "📊 Xu hướng thể loại (AI)"
-            )
-
-# ================= GENRE =================
 elif menu == "Đề xuất theo Thể loại":
-    show_chart = st.checkbox("📊 Hiển thị biểu đồ")
-
     st.session_state.last_results = recommend_by_genres(st.session_state.guest_genres)
 
+# ======================================================
+# SHOW RESULT
+# ======================================================
+if st.session_state.last_results is not None:
+    st.markdown("---")
     show_movies(st.session_state.last_results)
-    if show_chart:
-        plot_genre_chart_from_df(
-            st.session_state.last_results,
-            "📊 Xu hướng thể loại"
-        )
