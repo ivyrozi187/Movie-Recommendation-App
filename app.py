@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import ast
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -29,7 +28,7 @@ movies_df = load_movies()
 users_df = load_users()
 
 # ======================================================
-# SAFE COLUMN (CHỐNG KEYERROR)
+# SAFE COLUMN
 # ======================================================
 def safe_col(df, *cols):
     for c in cols:
@@ -85,7 +84,7 @@ def get_poster(row):
     return "https://via.placeholder.com/300x450?text=No+Image"
 
 # ======================================================
-# SHOW MOVIES (CÓ NÚT XEM CHI TIẾT)
+# SHOW MOVIES
 # ======================================================
 def show_movies(df):
     cols = st.columns(5)
@@ -97,10 +96,10 @@ def show_movies(df):
             btn_key = f"detail_{i}_{row['Tên phim']}"
             if st.button("🎬 Xem chi tiết", key=btn_key):
                 st.session_state.selected_movie = row["Tên phim"]
-                st.experimental_rerun()
+                st.rerun()
 
 # ======================================================
-# RECOMMEND FUNCTIONS
+# RECOMMENDERS
 # ======================================================
 def content_based(movie_name, top_n=10):
     if movie_name not in movies_df["Tên phim"].values:
@@ -136,28 +135,28 @@ if st.session_state.logged_in_user is None:
     st.markdown("## 🍿 DreamStream: Đề xuất Phim Cá nhân")
     tab1, tab2, tab3 = st.tabs(["Đăng Nhập", "Đăng Ký", "Chế Độ Khách"])
 
-    # LOGIN (NHẬP TAY)
+    # LOGIN
     with tab1:
         username = st.text_input("Tên người dùng:")
         if st.button("Đăng Nhập"):
             if username in users_df["Tên người dùng"].values:
                 st.session_state.logged_in_user = username
                 st.session_state.user_genres = []
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("❌ Người dùng không tồn tại")
 
-    # REGISTER (CHỌN THỂ LOẠI + ĐỀ XUẤT NGAY)
+    # REGISTER
     with tab2:
         new_user = st.text_input("Tên người dùng mới:")
-        genres = st.multiselect("Chọn ít nhất 3 thể loại bạn thích:", ALL_GENRES)
+        genres = st.multiselect("Chọn ít nhất 3 thể loại:", ALL_GENRES)
 
         if st.button("Hoàn tất & Xem đề xuất"):
             if new_user and len(genres) >= 3:
                 st.session_state.logged_in_user = new_user
                 st.session_state.user_genres = genres
                 st.session_state.is_new_user = True
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("⚠️ Nhập tên và chọn ≥ 3 thể loại")
 
@@ -166,7 +165,7 @@ if st.session_state.logged_in_user is None:
         if st.button("Truy cập với tư cách Khách"):
             st.session_state.logged_in_user = "GUEST"
             st.session_state.user_genres = []
-            st.experimental_rerun()
+            st.rerun()
 
     st.stop()
 
@@ -190,7 +189,7 @@ if st.session_state.selected_movie:
 
     if st.button("⬅️ Quay lại"):
         st.session_state.selected_movie = None
-        st.experimental_rerun()
+        st.rerun()
 
     st.stop()
 
@@ -213,34 +212,30 @@ if menu == "Đăng Xuất":
     st.session_state.logged_in_user = None
     st.session_state.selected_movie = None
     st.session_state.last_results = None
-    st.experimental_rerun()
+    st.rerun()
 
 # ======================================================
 # HOME
 # ======================================================
 st.markdown(f"## 🎬 Chào mừng, {st.session_state.logged_in_user}")
 
-# USER MỚI → ĐỀ XUẤT NGAY
 if st.session_state.is_new_user:
     st.subheader("🌟 Gợi ý cho bạn (Dựa trên thể loại yêu thích)")
     show_movies(recommend_by_genres(st.session_state.user_genres))
     st.session_state.is_new_user = False
 
-# CONTENT-BASED
 elif menu == "Đề xuất theo Tên Phim":
     movie = st.selectbox("Chọn phim:", movies_df["Tên phim"])
     if st.button("Tìm Đề Xuất"):
         st.session_state.last_results = content_based(movie)
 
-# PROFILE-BASED
 elif menu == "Đề xuất theo AI":
+    user_row = users_df[
+        users_df["Tên người dùng"] == st.session_state.logged_in_user
+    ].iloc[0]
     if st.button("Tìm Đề Xuất AI"):
-        user_row = users_df[
-            users_df["Tên người dùng"] == st.session_state.logged_in_user
-        ].iloc[0]
         st.session_state.last_results = profile_based(user_row)
 
-# GENRE-BASED
 elif menu == "Đề xuất theo Thể loại Yêu thích":
     if st.session_state.user_genres:
         st.session_state.last_results = recommend_by_genres(
