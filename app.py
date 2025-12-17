@@ -1,85 +1,178 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import ast
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import MinMaxScaler
+import os
+import random
 
-st.set_page_config(page_title="MovieFlix", layout="wide")
+# ===================== CONFIG =====================
+st.set_page_config("MovieFlix", layout="wide")
+
+# ===================== FILE CHECK =====================
+MOVIE_FILE = "movie_info_1000.csv"
+USER_FILE = "user_dataset_ready.csv"
+
+for f in [MOVIE_FILE, USER_FILE]:
+    if not os.path.exists(f):
+        st.error(f"❌ Thiếu file: {f}")
+        st.stop()
 
 # ===================== LOAD DATA =====================
 @st.cache_data
-def load_data():
-    df = pd.read_csv("user_dataset_ready.csv")
+def load_movies():
+    df = pd.read_csv(MOVIE_FILE).fillna("")
+    df["combined"] = df["Đạo diễn"] + " " + df["Diễn viên chính"] + " " + df["Thể loại phim"]
+    df["Độ phổ biến"] = pd.to_numeric(df["Độ phổ biến"], errors="coerce").fillna(df["Độ phổ biến"].mean())
+    scaler = MinMaxScaler()
+    df["pop_norm"] = scaler.fit_transform(df[["Độ phổ biến"]])
     return df
 
-users_df = load_data()
+@st.cache_data
+def load_users():
+    return pd.read_csv(USER_FILE)
 
-# ========== NAVBAR ==========
+movies_df = load_movies()
+users_df = load_users()
+
+# ===================== TF-IDF =====================
+@st.cache_resource
+def build_similarity(df):
+    tfidf = TfidfVectorizer(stop_words="english")
+    matrix = tfidf.fit_transform(df["combined"])
+    return cosine_similarity(matrix)
+
+cosine_sim = build_similarity(movies_df)
+
+# ===================== SESSION =====================
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "guest_topics" not in st.session_state:
+    st.session_state.guest_topics = []
+
+# ===================== CSS (NETFLIX STYLE) =====================
 st.markdown("""
 <style>
-.navbar {
-    background-color: #141414;
-    padding: 15px;
+body { background-color: #141414; }
+h1,h2,h3,p { color:white; }
+[data-testid="stImage"] {
+    border-radius: 12px;
+    transition: transform .2s;
 }
-.navbar h1 {
-    color: #E50914;
-    margin: 0;
-    font-size: 30px;
-}
+[data-testid="stImage"]:hover { transform: scale(1.05); }
 </style>
-<div class="navbar">
-    <h1>MovieFlix</h1>
-</div>
 """, unsafe_allow_html=True)
 
-# ========== SELECT USER ==========
-user_id = st.selectbox("Chọn người dùng", users_df["user_id"])
-user = users_df[users_df["user_id"] == user_id].iloc[0]
+# ===================== LOGIN / GUEST =====================
+def login_page():
+    st.title("🎬 MovieFlix")
 
-# ========== HERO BANNER ==========
-st.markdown("""
-<style>
-.hero {
-    background-image: url('https://images.unsplash.com/photo-1606761560503-b7a8e4f0f4d6');
-    background-size: cover;
-    background-position: center;
-    height: 350px;
-    border-radius: 8px;
-}
-.hero h2 {
-    color: white;
-    padding: 150px 30px;
-    font-size: 48px;
-    text-shadow: 2px 2px 6px black;
-}
-</style>
-<div class="hero">
-    <h2>Đề xuất cho bạn</h2>
-</div>
-""", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        username = st.text_input("Tên người dùng")
+        if st.button("Đăng nhập"):
+            if username in users_df["username"].values:
+                st.session_state.user = username
+                st.rerun()
+            else:
+                st.error("User không tồn tại")
 
-# ========== MOVIE ROW ==========
-def movie_row(title, movie_list, image_list):
-    st.markdown(f"### {title}")
-    cols = st.columns(len(movie_list))
-    for col, m, img in zip(cols, movie_list, image_list):
+    with col2:
+        if st.button("🚀 Dùng thử (Guest)"):
+            st.session_state.user = "GUEST"
+            st.rerun()
+
+# ===================== ZERO CLICK =====================
+TOPICS = {
+    "Marvel": ["Action", "Sci-Fi"],
+    "Sitcom": ["Comedy"],
+    "Cổ Trang": ["History", "Drama"],
+    "Xuyên Không": ["Fantasy", "Sci-Fi"]
+}
+
+def zero_click_recommend(genres):
+    pattern = "|".join(genres)
+    return movies_df[movies_df["Thể loại phim"].str.contains(pattern, na=False)] \
+        .sort_values("Độ phổ biến", ascending=False).head(10)
+
+# ===================== CONTENT BASED =====================
+def content_based(movie_name, w_sim):
+    idx = movies_df[movies_df["Tên phim"] == movie_name].index[0]
+    scores = list(enumerate(cosine_sim[idx]))
+    df = pd.DataFrame(scores, columns=["idx","sim"])
+    df = df.merge(movies_df, left_on="idx", right_index=True)
+    df["score"] = w_sim * df["sim"] + (1 - w_sim) * df["pop_norm"]
+    return df.sort_values("score", ascending=False).head(10)
+
+# ===================== PROFILE BASED =====================
+def profile_based(user):
+    fav = users_df[users_df["username"] == user]["favorite_movie"].iloc[0]
+    genres = movies_df[movies_df["Tên phim"] == fav]["Thể loại phim"].iloc[0]
+    return movies_df[movies_df["Thể loại phim"].str.contains(genres.split(",")[0], na=False)] \
+        .sort_values("Độ phổ biến", ascending=False).head(10)
+
+# ===================== MAIN =====================
+if not st.session_state.user:
+    login_page()
+    st.stop()
+
+st.sidebar.title("🎬 Menu")
+
+if st.sidebar.button("Đăng xuất"):
+    st.session_state.user = None
+    st.rerun()
+
+# ===================== GUEST MODE =====================
+if st.session_state.user == "GUEST":
+    st.header("🔥 Bạn quan tâm gì?")
+    cols = st.columns(len(TOPICS))
+
+    for col, t in zip(cols, TOPICS):
         with col:
-            st.image(img, use_container_width=True)
-            st.write(m)
+            if st.button(t):
+                st.session_state.guest_topics = TOPICS[t]
 
-# ========== RECENTLY WATCHED ==========
-recent_movies = user["recent_movies"].split("|")
-recent_images = user["recent_images"].split("|")
-movie_row("Phim đã xem gần nhất", recent_movies, recent_images)
+    if st.session_state.guest_topics:
+        rec = zero_click_recommend(st.session_state.guest_topics)
+        st.subheader("🎯 Gợi ý cho bạn")
+        st.dataframe(rec[["Tên phim","Thể loại phim","Độ phổ biến"]])
 
-# ========== FAVORITE ==========
-st.markdown("### Phim yêu thích")
-st.image(user["favorite_image"], width=240)
-st.write(user["favorite_movie"])
+        fig, ax = plt.subplots()
+        rec.groupby("Thể loại phim")["Độ phổ biến"].mean().head(5).plot(kind="bar", ax=ax)
+        st.pyplot(fig)
 
-# ========== SIMPLE RECOMMENDATIONS ==========
-other = users_df[users_df["user_id"] != user_id].sample(5).iloc[0]
-rec_movies = other["recent_movies"].split("|")
-rec_images = other["recent_images"].split("|")
-movie_row("Gợi ý cho bạn", rec_movies, rec_images)
+# ===================== USER MODE =====================
+else:
+    user = users_df[users_df["username"] == st.session_state.user].iloc[0]
 
-# ========== END ==========
-st.markdown("---")
-st.write("🚀 Ứng dụng gợi ý phim tích hợp phong cách Netflix")
+    st.title(f"🍿 Xin chào {user['username']}")
+
+    movies = user["recent_movies"].split("|")
+    imgs = user["recent_images"].split("|")
+
+    st.subheader("🎞️ Phim đã xem")
+    cols = st.columns(5)
+    for c,m,i in zip(cols,movies,imgs):
+        c.image(i, use_container_width=True)
+        c.caption(m)
+
+    st.subheader("❤️ Phim yêu thích")
+    st.image(user["favorite_image"], width=260)
+    st.write(user["favorite_movie"])
+
+    tab1, tab2 = st.tabs(["🎥 Theo phim", "👤 Theo hồ sơ"])
+
+    with tab1:
+        movie = st.selectbox("Chọn phim", movies_df["Tên phim"])
+        w = st.slider("Similarity", 0.0, 1.0, 0.7)
+        if st.button("Gợi ý"):
+            rec = content_based(movie, w)
+            st.dataframe(rec[["Tên phim","score","Độ phổ biến"]])
+
+    with tab2:
+        if st.button("Gợi ý theo hồ sơ"):
+            rec = profile_based(st.session_state.user)
+            st.dataframe(rec[["Tên phim","Thể loại phim","Độ phổ biến"]])
