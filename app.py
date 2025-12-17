@@ -1,42 +1,31 @@
 import streamlit as st
 
-# ================== BẮT BUỘC: PAGE CONFIG Ở ĐẦU ==================
+# ================== PAGE CONFIG (BẮT BUỘC Ở ĐẦU) ==================
 st.set_page_config(
     page_title="Movie Recommender AI",
     page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 import pandas as pd
 import numpy as np
-import ast
-import matplotlib.pyplot as plt
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler
-import matplotlib.colors as mcolors
 
 # ================== FILE ==================
-USER_DATA_FILE = "danh_sach_nguoi_dung_moi.csv"
 MOVIE_DATA_FILE = "data_phim_full_images.csv"
-GUEST_USER = "Guest"
 
-# ================== LOAD DATA AN TOÀN ==================
+# ================== LOAD DATA ==================
 @st.cache_data
-def load_data(path):
-    try:
-        return pd.read_csv(path).fillna("")
-    except:
-        st.error(f"❌ Không tìm thấy file: {path}")
-        return pd.DataFrame()
+def load_data():
+    df = pd.read_csv(MOVIE_DATA_FILE).fillna("")
+    return df
 
-# ================== THEME ==================
-def inject_light_theme():
+# ================== THEME + CSS ==================
+def inject_css():
     st.markdown("""
     <style>
         .stApp { background-color:#F7F9FC; }
         h1,h2,h3 { font-weight:800; }
+
         .movie-grid {
             display:grid;
             grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
@@ -54,135 +43,97 @@ def inject_light_theme():
             transform:translateY(-8px);
             box-shadow:0 12px 30px rgba(0,188,212,.5);
         }
-        .poster {
+        .movie-poster img {
+            width:100%;
             height:300px;
-            background:#E0F7FA;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            font-size:40px;
+            object-fit:cover;
         }
-        .info {
+        .movie-info {
             padding:15px;
         }
         .score {
             color:#00BCD4;
             font-weight:800;
         }
+        .genre {
+            font-size:13px;
+            color:#666;
+        }
     </style>
     """, unsafe_allow_html=True)
 
 # ================== HELPERS ==================
-def parse_genres(s):
-    return set(g.strip() for g in s.split(",") if g.strip())
+def get_all_genres(df):
+    genres = set()
+    for g in df["Thể loại phim"]:
+        for item in str(g).split(","):
+            genres.add(item.strip())
+    return sorted(list(genres))
 
-# ================== PREPROCESS ==================
-@st.cache_resource
-def preprocess_movies():
-    df = load_data(MOVIE_DATA_FILE)
-    if df.empty:
-        return df, np.array([[]])
-
-    df["combined"] = df["Đạo diễn"] + " " + df["Diễn viên chính"] + " " + df["Thể loại phim"]
-
-    tfidf = TfidfVectorizer(stop_words="english")
-    matrix = tfidf.fit_transform(df["combined"])
-    cosine_sim = cosine_similarity(matrix)
-
-    df["Độ phổ biến"] = pd.to_numeric(df["Độ phổ biến"], errors="coerce").fillna(0)
-    df["parsed_genres"] = df["Thể loại phim"].apply(parse_genres)
-
-    return df, cosine_sim
-
-# ================== SESSION ==================
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "users" not in st.session_state:
-    st.session_state.users = load_data(USER_DATA_FILE)
-
-# ================== AUTH ==================
-def login_page():
-    st.header("🔐 Đăng nhập")
-
-    username = st.text_input("Tên người dùng")
-    if st.button("Đăng nhập", type="primary"):
-        if username in st.session_state.users["Tên người dùng"].values:
-            st.session_state.user = username
-            st.rerun()
-        else:
-            st.error("❌ Không tồn tại")
-
-    st.divider()
-    if st.button("👀 Dùng thử không cần đăng nhập"):
-        st.session_state.user = GUEST_USER
-        st.rerun()
-
-def register_page():
-    st.header("📝 Đăng ký")
-
-    username = st.text_input("Tên người dùng mới")
-    genres = st.multiselect(
-        "Chọn thể loại yêu thích",
-        movies["Thể loại phim"].str.split(",").explode().unique()
-    )
-
-    if st.button("Đăng ký", type="primary"):
-        if not username or not genres:
-            st.error("Thiếu thông tin")
-            return
-
-        new = {
-            "ID": len(st.session_state.users) + 1,
-            "Tên người dùng": username,
-            "5 phim coi gần nhất": str(genres),
-            "Phim yêu thích nhất": ""
-        }
-        st.session_state.users = pd.concat(
-            [st.session_state.users, pd.DataFrame([new])],
-            ignore_index=True
-        )
-        st.session_state.user = username
-        st.success("🎉 Thành công")
-        st.rerun()
-
-# ================== DISPLAY GRID ==================
-def show_movies(df, score_col):
+def display_movies(df, score_col):
     st.markdown('<div class="movie-grid">', unsafe_allow_html=True)
-    for _, r in df.iterrows():
+
+    for _, row in df.iterrows():
+        title = row["Tên phim"]
+        genres = row["Thể loại phim"]
+        score = row[score_col]
+        poster = row.get("Poster", "")
+
+        poster_html = (
+            f"<img src='{poster}'>" if poster else "<div style='height:300px;display:flex;align-items:center;justify-content:center;'>🎬</div>"
+        )
+
         st.markdown(f"""
         <div class="movie-card">
-            <div class="poster">🎬</div>
-            <div class="info">
-                <b>{r['Tên phim']}</b><br>
-                <span class="score">{score_col}: {r[score_col]:.2f}</span>
+            <div class="movie-poster">
+                {poster_html}
+            </div>
+            <div class="movie-info">
+                <b>{title}</b>
+                <div class="genre">{genres}</div>
+                <div class="score">Score: {score:.2f}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ================== MAIN ==================
-inject_light_theme()
-movies, cosine_sim = preprocess_movies()
+# ================== MAIN APP ==================
+inject_css()
+movies = load_data()
 
-if st.session_state.user is None:
-    tab1, tab2 = st.tabs(["Đăng nhập", "Đăng ký"])
-    with tab1: login_page()
-    with tab2: register_page()
-    st.stop()
+st.title("🎬 HỆ THỐNG ĐỀ XUẤT PHIM THEO THỂ LOẠI")
+st.caption("Chọn nhiều thể loại bạn yêu thích, hệ thống sẽ đề xuất phim phù hợp nhất")
 
-# ================== APP ==================
-st.title(f"🎬 Chào mừng {st.session_state.user}")
+# --------- CHỌN THỂ LOẠI ---------
+all_genres = get_all_genres(movies)
 
-movie_list = movies["Tên phim"].tolist()
-selected = st.selectbox("Chọn phim bạn thích", movie_list)
+selected_genres = st.multiselect(
+    "🎭 Chọn thể loại (có thể chọn nhiều):",
+    options=all_genres,
+    placeholder="Ví dụ: Phim Hành Động, Phim Chiến Tranh, Phim Khoa Học Viễn Tưởng"
+)
 
-idx = movies[movies["Tên phim"] == selected].index[0]
-scores = list(enumerate(cosine_sim[idx]))
-df_sim = pd.DataFrame(scores, columns=["i", "score"])
-df_rec = movies.join(df_sim.set_index("i"), how="left").sort_values("score", ascending=False)[1:11]
+# --------- ĐỀ XUẤT ---------
+if selected_genres:
+    st.info(f"🔍 Đề xuất cho thể loại: {', '.join(selected_genres)}")
 
-show_movies(df_rec, "score")
+    def genre_score(movie_genres):
+        movie_genres = set(str(movie_genres).split(","))
+        return len(movie_genres.intersection(selected_genres))
 
-if st.button("🚪 Đăng xuất"):
-    st.session_state.user = None
-    st.rerun()
+    movies["genre_score"] = movies["Thể loại phim"].apply(genre_score)
+
+    recommendations = (
+        movies[movies["genre_score"] > 0]
+        .sort_values(by=["genre_score", "Độ phổ biến"], ascending=False)
+        .head(12)
+    )
+
+    if recommendations.empty:
+        st.warning("❌ Không tìm thấy phim phù hợp")
+    else:
+        display_movies(recommendations, "genre_score")
+
+else:
+    st.warning("👉 Vui lòng chọn ít nhất 1 thể loại")
