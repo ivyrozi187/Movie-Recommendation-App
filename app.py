@@ -28,7 +28,7 @@ movies_df = load_movies()
 users_df = load_users()
 
 # ======================================================
-# SAFE COLUMN
+# SAFE COLUMN (CHỐNG KEYERROR)
 # ======================================================
 def safe_col(df, *cols):
     for c in cols:
@@ -84,7 +84,7 @@ def get_poster(row):
     return "https://via.placeholder.com/300x450?text=No+Image"
 
 # ======================================================
-# SHOW MOVIES
+# SHOW MOVIES (CÓ NÚT XEM CHI TIẾT)
 # ======================================================
 def show_movies(df):
     cols = st.columns(5)
@@ -99,7 +99,7 @@ def show_movies(df):
                 st.rerun()
 
 # ======================================================
-# RECOMMENDERS
+# RECOMMEND FUNCTIONS
 # ======================================================
 def content_based(movie_name, top_n=10):
     if movie_name not in movies_df["Tên phim"].values:
@@ -129,13 +129,35 @@ def profile_based(user_row, top_n=10):
     return df.sample(min(top_n, len(df)))
 
 # ======================================================
+# ⭐ NEW: RECOMMEND FROM FAVORITE MOVIE
+# ======================================================
+def recommend_from_favorite_movie(user_row, top_n=10):
+    fav_movie = user_row.get("Phim yêu thích nhất", "")
+
+    if fav_movie not in movies_df["Tên phim"].values:
+        return movies_df.sample(top_n)
+
+    fav_genre = movies_df[
+        movies_df["Tên phim"] == fav_movie
+    ]["Thể loại phim"].values[0]
+
+    df = movies_df[
+        movies_df["Thể loại phim"].str.contains(
+            fav_genre.split(",")[0],
+            na=False
+        )
+    ]
+
+    return df.sample(min(top_n, len(df))) if not df.empty else movies_df.sample(top_n)
+
+# ======================================================
 # LOGIN / REGISTER / GUEST
 # ======================================================
 if st.session_state.logged_in_user is None:
     st.markdown("## 🍿 DreamStream: Đề xuất Phim Cá nhân")
     tab1, tab2, tab3 = st.tabs(["Đăng Nhập", "Đăng Ký", "Chế Độ Khách"])
 
-    # LOGIN
+    # LOGIN (NHẬP TAY)
     with tab1:
         username = st.text_input("Tên người dùng:")
         if st.button("Đăng Nhập"):
@@ -146,7 +168,7 @@ if st.session_state.logged_in_user is None:
             else:
                 st.error("❌ Người dùng không tồn tại")
 
-    # REGISTER
+    # REGISTER (CHỌN THỂ LOẠI → ĐỀ XUẤT NGAY)
     with tab2:
         new_user = st.text_input("Tên người dùng mới:")
         genres = st.multiselect("Chọn ít nhất 3 thể loại:", ALL_GENRES)
@@ -219,16 +241,19 @@ if menu == "Đăng Xuất":
 # ======================================================
 st.markdown(f"## 🎬 Chào mừng, {st.session_state.logged_in_user}")
 
+# USER MỚI → ĐỀ XUẤT NGAY
 if st.session_state.is_new_user:
-    st.subheader("🌟 Gợi ý cho bạn (Dựa trên thể loại yêu thích)")
+    st.subheader("🌟 Gợi ý cho bạn (Dựa trên thể loại đã chọn)")
     show_movies(recommend_by_genres(st.session_state.user_genres))
     st.session_state.is_new_user = False
 
+# CONTENT-BASED
 elif menu == "Đề xuất theo Tên Phim":
     movie = st.selectbox("Chọn phim:", movies_df["Tên phim"])
     if st.button("Tìm Đề Xuất"):
         st.session_state.last_results = content_based(movie)
 
+# PROFILE-BASED
 elif menu == "Đề xuất theo AI":
     user_row = users_df[
         users_df["Tên người dùng"] == st.session_state.logged_in_user
@@ -236,13 +261,13 @@ elif menu == "Đề xuất theo AI":
     if st.button("Tìm Đề Xuất AI"):
         st.session_state.last_results = profile_based(user_row)
 
+# ⭐ GENRE FROM FAVORITE MOVIE
 elif menu == "Đề xuất theo Thể loại Yêu thích":
-    if st.session_state.user_genres:
-        st.session_state.last_results = recommend_by_genres(
-            st.session_state.user_genres
-        )
-    else:
-        st.info("⚠️ Người dùng chưa có thể loại yêu thích")
+    user_row = users_df[
+        users_df["Tên người dùng"] == st.session_state.logged_in_user
+    ].iloc[0]
+
+    st.session_state.last_results = recommend_from_favorite_movie(user_row)
 
 # ======================================================
 # SHOW RESULTS
