@@ -882,7 +882,8 @@ def display_movie_grid(df_results, score_column):
     
     for index, row in df_results.iterrows():
         title = row['Tên phim']
-        score = row[score_column]
+        # Sửa lỗi: Đảm bảo score_column tồn tại trước khi truy cập
+        score = row.get(score_column, 0)
         # Xử lý Năm phát hành, đảm bảo là số nguyên
         year = int(row.get('Năm phát hành', 'N/A')) if pd.notna(row.get('Năm phát hành')) and row.get('Năm phát hành') != "" else 'N/A'
         
@@ -981,9 +982,10 @@ def main_page(df_movies, cosine_sim):
     # DETAIL PAGE LOGIC
     # ======================================================
     if st.session_state.selected_movie:
+        # Lấy row chi tiết của phim được chọn
         m_row = df_movies[df_movies["Tên phim"] == st.session_state.selected_movie].iloc[0]
         
-        # Vì không dùng ảnh, dùng khối màu lớn và tiêu đề
+        # Hiển thị chi tiết phim
         st.markdown(f"""
         <div style='background-color: #E0F7FA; padding: 40px; border-radius: 10px; border: 2px solid #00BCD4; margin-bottom: 20px; text-align: center;'>
             <h1 style='color: #00BCD4;'>{m_row["Tên phim"]}</h1>
@@ -995,7 +997,7 @@ def main_page(df_movies, cosine_sim):
         """, unsafe_allow_html=True)
         
         st.subheader("🎯 Phim tương tự (Content-Based)")
-        # Sử dụng content_based mới
+        # Lấy 5 phim tương tự (dùng content_based)
         recommended_df = content_based(m_row["Tên phim"], cosine_sim, df_movies, 5)
         display_movie_grid(recommended_df, 'score')
         
@@ -1040,16 +1042,39 @@ def main_page(df_movies, cosine_sim):
             try:
                 # Sửa lỗi: Lấy danh sách tên phim từ cột
                 recent_movies_str = user["5 phim coi gần nhất"]
-                recent_movies_list = ast.literal_eval(recent_movies_str)
-                # Đảm bảo đây là list tên phim (giả định)
-            except:
-                recent_movies_list = []
+                # Cột này lưu list genres dưới dạng chuỗi khi đăng ký, nếu là user cũ có thể là tên phim
+                
+                # Cố gắng chuyển đổi thành list tên phim (nếu có)
+                if recent_movies_str.startswith("[") and recent_movies_str.endswith("]"):
+                     # Trường hợp user mới, cột này lưu list genres. Cần tìm 5 phim ngẫu nhiên thuộc genres đó
+                     # Tạm thời chỉ lấy tên phim nếu cột này chứa tên phim
+                     if any(m in df_movies['Tên phim'].values for m in ast.literal_eval(recent_movies_str)):
+                         recent_movies_list = ast.literal_eval(recent_movies_str)
+                     else:
+                          # Nếu là list genres, ta hiển thị 5 phim ngẫu nhiên thuộc các genres đó
+                          genres = ast.literal_eval(recent_movies_str)
+                          recent_df = recommend_by_genres(df_movies, genres, top_n=5)
+                          recent_movies_list = recent_df['Tên phim'].tolist()
+
+                else:
+                    recent_movies_list = [recent_movies_str] # Chỉ có 1 tên phim? Rất khó xử lý
+                    
+            except Exception as e:
+                # Nếu không thể parse, giả định cột này chứa tên phim
+                if recent_movies_str and not recent_movies_str.startswith("["):
+                    recent_movies_list = [recent_movies_str] 
+                else:
+                    recent_movies_list = []
             
-            # Lấy thông tin chi tiết của 5 phim (không cần giới hạn 5 vì user data đã có 5 phim)
-            recent_df = df_movies[df_movies["Tên phim"].isin(recent_movies_list)]
+            # --- LOGIC MỚI: DÙNG HÀM TRUY VẤN ĐỂ LẤY DF CHI TIẾT ---
+            # Đây là logic chuẩn để lấy DF từ list tên phim
+            if recent_movies_list and recent_movies_list[0]:
+                recent_df = df_movies[df_movies["Tên phim"].isin(recent_movies_list)]
+            else:
+                recent_df = pd.DataFrame()
             
+            # Đảm bảo hiển thị 5 phim nếu có
             if not recent_df.empty:
-                # Hiển thị list 5 phim đã xem (có thể dùng grid)
                 display_movie_grid(recent_df, 'Độ phổ biến') # Dùng Độ phổ biến làm score tạm
             else:
                 st.info("Chưa có phim nào trong lịch sử xem của bạn.")
@@ -1087,7 +1112,7 @@ def main_page(df_movies, cosine_sim):
         st.subheader("1️⃣ Đề xuất theo Nội dung")
         movie_titles = df_movies["Tên phim"].unique().tolist()
         
-        # Sửa lỗi: selectbox phải chọn tên phim để người dùng có thể tìm
+        # selectbox chọn tên phim
         selected_movie_name = st.selectbox("Chọn phim:", movie_titles)
         
         # Sửa lỗi: Khi bấm nút "Tìm" sẽ hiển thị chính phim đó và kích hoạt trang chi tiết
@@ -1223,6 +1248,7 @@ if __name__ == '__main__':
         user_genres_str = user_row['5 phim coi gần nhất']
         user_genres_list = []
         try:
+            # Sửa lỗi: Cột này lưu list genres dưới dạng chuỗi khi đăng ký
             user_genres_list = ast.literal_eval(user_genres_str)
         except:
             pass # Mặc định là list rỗng
