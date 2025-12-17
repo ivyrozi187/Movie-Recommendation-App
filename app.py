@@ -21,13 +21,21 @@ def load_users():
 movies = load_movies()
 users = load_users()
 
+# ================= SAFE COLUMN =================
+def safe_col(df, col):
+    if col in df.columns:
+        return df[col].astype(str)
+    return ""
+
 # ================= CONTENT =================
 movies["content"] = (
-    movies["Thể loại phim"].astype(str) + " " +
-    movies.get("Diễn viên", "").astype(str) + " " +
-    movies.get("Đạo diễn", "").astype(str)
+    safe_col(movies, "Thể loại phim") + " " +
+    safe_col(movies, "Diễn viên chính") + " " +
+    safe_col(movies, "Diễn viên") + " " +
+    safe_col(movies, "Đạo diễn")
 )
 
+# ================= TF-IDF =================
 tfidf = TfidfVectorizer(stop_words="english")
 cosine_sim = cosine_similarity(tfidf.fit_transform(movies["content"]))
 
