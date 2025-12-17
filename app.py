@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import ast
-import random
 import matplotlib.pyplot as plt
 from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -108,7 +107,7 @@ def content_based(movie_name, top_n=10):
         return movies_df.sample(top_n)
     idx = movies_df[movies_df["Tên phim"] == movie_name].index[0]
     scores = list(enumerate(cosine_sim[idx]))
-    scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n+1]
+    scores = sorted(scores, key=lambda x: x[1], reverse=True)[1:top_n + 1]
     return movies_df.iloc[[i[0] for i in scores]]
 
 def recommend_by_genres(genres, top_n=10):
@@ -126,16 +125,17 @@ def profile_based(user_row, top_n=10):
         watched = []
 
     watched = watched[:5]
-
     genres = movies_df[movies_df["Tên phim"].isin(watched)]["Thể loại phim"]
+
     if genres.empty:
         return movies_df.sample(top_n)
+
     main = genres.str.split(",").explode().value_counts().idxmax()
     df = movies_df[movies_df["Thể loại phim"].str.contains(main, na=False)]
     return df.sample(min(top_n, len(df)))
 
 # ======================================================
-# 📊 USER TREND CHART
+# CHARTS
 # ======================================================
 def plot_user_trend_from_movies(movie_list):
     genres = []
@@ -145,20 +145,30 @@ def plot_user_trend_from_movies(movie_list):
             genres.extend(row.iloc[0]["Thể loại phim"].split(","))
 
     if not genres:
-        st.info("Không đủ dữ liệu để vẽ biểu đồ xu hướng")
+        st.info("Không đủ dữ liệu để vẽ biểu đồ")
         return
 
     counter = Counter([g.strip() for g in genres])
-    labels = list(counter.keys())
-    values = list(counter.values())
-
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.bar(labels, values, color="#f4a7b9")
-    ax.set_title("Xu hướng xem phim của bạn")
-    ax.set_ylabel("Số lần")
-    ax.set_xlabel("Thể loại")
+    ax.bar(counter.keys(), counter.values())
+    ax.set_title("📊 Xu hướng xem phim của bạn")
     plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
+    st.pyplot(fig)
+
+def plot_trend_from_df(df, title):
+    genres = []
+    for _, row in df.iterrows():
+        genres.extend(row["Thể loại phim"].split(","))
+
+    if not genres:
+        st.info("Không đủ dữ liệu để vẽ biểu đồ")
+        return
+
+    counter = Counter([g.strip() for g in genres])
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(counter.keys(), counter.values())
+    ax.set_title(title)
+    plt.xticks(rotation=45, ha="right")
     st.pyplot(fig)
 
 # ======================================================
@@ -177,8 +187,8 @@ if st.session_state.logged_in_user is None:
 
     with tab2:
         new = st.text_input("Tên người dùng mới")
-        g = st.multiselect("Chọn thể loại bạn thích:", ALL_GENRES)
-        if st.button("Hoàn tất & Đề xuất"):
+        g = st.multiselect("Chọn thể loại yêu thích:", ALL_GENRES)
+        if st.button("Hoàn tất"):
             if new and len(g) >= 2:
                 st.session_state.logged_in_user = new
                 st.session_state.user_genres = g
@@ -190,7 +200,7 @@ if st.session_state.logged_in_user is None:
             "Chọn thể loại muốn xem:",
             ALL_GENRES
         )
-        if st.button("Truy cập với tư cách Khách"):
+        if st.button("Vào chế độ Khách"):
             if len(st.session_state.guest_genres) >= 1:
                 st.session_state.logged_in_user = "GUEST"
                 st.rerun()
@@ -233,7 +243,7 @@ if menu == "Đăng Xuất":
 # ======================================================
 # HOME
 # ======================================================
-st.header(f"🎬 Chào mừng, {st.session_state.logged_in_user}")
+st.header(f"🎬 Xin chào, {st.session_state.logged_in_user}")
 
 # ================== 👤 CÁ NHÂN ==================
 if menu == "Cá nhân":
@@ -244,37 +254,29 @@ if menu == "Cá nhân":
             users_df["Tên người dùng"] == st.session_state.logged_in_user
         ].iloc[0]
 
-        st.subheader("🎞️ 5 phim bạn xem gần nhất")
-
         try:
-            recent_movies = ast.literal_eval(user["5 phim coi gần nhất"])
+            recent_movies = ast.literal_eval(user["5 phim coi gần nhất"])[:5]
         except:
             recent_movies = []
 
-        recent_movies = recent_movies[:5]
-
-        recent_df = movies_df[movies_df["Tên phim"].isin(recent_movies)]
-        show_movies(recent_df)
-
-        st.subheader("📊 Xu hướng xem phim")
+        show_movies(movies_df[movies_df["Tên phim"].isin(recent_movies)])
         plot_user_trend_from_movies(recent_movies)
 
-# ================== 🔍 TÌM PHIM THEO TÊN ==================
+# ================== 🔍 SEARCH ==================
 elif menu == "Tìm phim theo tên":
-    keyword = st.text_input("Nhập tên phim cần tìm")
+    keyword = st.text_input("Nhập chính xác tên phim")
 
     if keyword:
-        result = movies_df[
-            movies_df["Tên phim"].str.lower() == keyword.lower()
-        ]
-
+        result = movies_df[movies_df["Tên phim"].str.lower() == keyword.lower()]
         if not result.empty:
             show_movies(result)
         else:
-            st.warning("❌ Không tìm thấy phim")
+            st.warning("Không tìm thấy phim")
 
 # ================== 🤖 AI ==================
 elif menu == "Đề xuất theo AI":
+    show_chart = st.checkbox("📊 Hiển thị biểu đồ xu hướng đề xuất")
+
     if st.button("🎬 Đề xuất AI"):
         if st.session_state.logged_in_user == "GUEST":
             st.session_state.last_results = recommend_by_genres(
@@ -286,41 +288,36 @@ elif menu == "Đề xuất theo AI":
             ].iloc[0]
             st.session_state.last_results = profile_based(user)
 
-    if st.button("🔄 Tạo đề xuất mới"):
-        if st.session_state.logged_in_user == "GUEST":
-            st.session_state.last_results = recommend_by_genres(
-                st.session_state.guest_genres
-            )
-        else:
-            user = users_df[
-                users_df["Tên người dùng"] == st.session_state.logged_in_user
-            ].iloc[0]
-            st.session_state.last_results = profile_based(user)
+    if show_chart and st.session_state.last_results is not None:
+        plot_trend_from_df(
+            st.session_state.last_results,
+            "📊 Xu hướng thể loại (AI đề xuất)"
+        )
 
 # ================== 🎯 GENRE ==================
 elif menu == "Đề xuất theo Thể loại Yêu thích":
+    show_chart = st.checkbox("📊 Hiển thị biểu đồ xu hướng đề xuất")
+
     if st.session_state.logged_in_user == "GUEST":
         st.session_state.last_results = recommend_by_genres(
             st.session_state.guest_genres
         )
-        if st.button("🔄 Tạo đề xuất mới"):
-            st.session_state.last_results = recommend_by_genres(
-                st.session_state.guest_genres
-            )
     else:
         user = users_df[
             users_df["Tên người dùng"] == st.session_state.logged_in_user
         ].iloc[0]
         fav = user["Phim yêu thích nhất"]
         if fav in movies_df["Tên phim"].values:
-            g = movies_df[
-                movies_df["Tên phim"] == fav
-            ]["Thể loại phim"].values[0].split(",")
-
+            g = movies_df[movies_df["Tên phim"] == fav][
+                "Thể loại phim"
+            ].values[0].split(",")
             st.session_state.last_results = recommend_by_genres(g)
 
-            if st.button("🔄 Tạo đề xuất mới"):
-                st.session_state.last_results = recommend_by_genres(g)
+    if show_chart and st.session_state.last_results is not None:
+        plot_trend_from_df(
+            st.session_state.last_results,
+            "📊 Xu hướng thể loại (Theo sở thích)"
+        )
 
 # ======================================================
 # SHOW RESULTS
