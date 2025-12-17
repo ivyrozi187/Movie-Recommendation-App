@@ -129,7 +129,7 @@ def profile_based(user_row, top_n=10):
     return df.sample(min(top_n, len(df)))
 
 # ======================================================
-# 📊 USER VIEWING TREND CHART
+# 📊 USER VIEWING TREND CHART (THỐNG KÊ XU HƯỚNG)
 # ======================================================
 def plot_user_trend(genres, title="Xu hướng xem phim của người dùng"):
     if not genres:
@@ -269,7 +269,7 @@ elif menu == "Đề xuất theo AI":
             user = users_df[users_df["Tên người dùng"] == st.session_state.logged_in_user].iloc[0]
             st.session_state.last_results = profile_based(user)
 
-# GENRE FAVORITE + REFRESH
+# GENRE FAVORITE + REFRESH (ALL HAVE 🔄)
 elif menu == "Đề xuất theo Thể loại Yêu thích":
     if st.session_state.logged_in_user == "GUEST":
         st.session_state.last_results = recommend_by_genres(
@@ -287,6 +287,7 @@ elif menu == "Đề xuất theo Thể loại Yêu thích":
         fav = user["Phim yêu thích nhất"]
         if fav in movies_df["Tên phim"].values:
             g = movies_df[movies_df["Tên phim"] == fav]["Thể loại phim"].values[0].split(",")
+
             st.session_state.last_results = recommend_by_genres(g)
 
             if st.button("🔄 Tạo đề xuất mới"):
