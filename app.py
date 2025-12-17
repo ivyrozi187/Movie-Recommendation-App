@@ -3,6 +3,7 @@ import pandas as pd
 import ast
 import random
 import matplotlib.pyplot as plt
+from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -100,27 +101,6 @@ def show_movies(df):
                 st.rerun()
 
 # ======================================================
-# PLOT CHART
-# ======================================================
-def plot_recommendation_bar(df, title="So sánh Đề xuất Phim"):
-    if df is None or df.empty:
-        return
-
-    plot_df = df.head(10).copy()
-    plot_df["score"] = range(1, len(plot_df) + 1)
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.barh(plot_df["Tên phim"], plot_df["score"], color="#f4a7b9")
-    ax.set_title(title)
-    ax.set_xlabel("Điểm đề xuất")
-    ax.invert_yaxis()
-
-    for i, v in enumerate(plot_df["score"]):
-        ax.text(v + 0.05, i, f"{v:.2f}", va="center")
-
-    st.pyplot(fig)
-
-# ======================================================
 # RECOMMEND FUNCTIONS
 # ======================================================
 def content_based(movie_name, top_n=10):
@@ -147,6 +127,35 @@ def profile_based(user_row, top_n=10):
     main = genres.str.split(",").explode().value_counts().idxmax()
     df = movies_df[movies_df["Thể loại phim"].str.contains(main, na=False)]
     return df.sample(min(top_n, len(df)))
+
+# ======================================================
+# 📊 USER TREND CHART
+# ======================================================
+def plot_user_trend_from_movies(movie_list):
+    genres = []
+    for m in movie_list:
+        row = movies_df[movies_df["Tên phim"] == m]
+        if not row.empty:
+            genres.extend(
+                row.iloc[0]["Thể loại phim"].split(",")
+            )
+
+    if not genres:
+        st.info("Không đủ dữ liệu để vẽ biểu đồ xu hướng")
+        return
+
+    counter = Counter([g.strip() for g in genres])
+    labels = list(counter.keys())
+    values = list(counter.values())
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(labels, values, color="#f4a7b9")
+    ax.set_title("Xu hướng xem phim của bạn")
+    ax.set_ylabel("Số lần")
+    ax.set_xlabel("Thể loại")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    st.pyplot(fig)
 
 # ======================================================
 # LOGIN / REGISTER / GUEST
@@ -200,11 +209,12 @@ if st.session_state.selected_movie:
     st.stop()
 
 # ======================================================
-# SIDEBAR
+# SIDEBAR (THÊM MENU CÁ NHÂN)
 # ======================================================
 menu = st.sidebar.radio(
     "Menu",
     [
+        "Cá nhân",
         "Đề xuất theo Tên Phim",
         "Đề xuất theo AI",
         "Đề xuất theo Thể loại Yêu thích",
@@ -221,26 +231,49 @@ if menu == "Đăng Xuất":
 # ======================================================
 st.header(f"🎬 Chào mừng, {st.session_state.logged_in_user}")
 
-# USER MỚI
-if st.session_state.is_new_user:
-    st.subheader("🎯 Chọn lại thể loại & Đề xuất")
+# ================== 👤 CÁ NHÂN ==================
+if menu == "Cá nhân":
+    if st.session_state.logged_in_user == "GUEST":
+        st.info("Chế độ Khách không có trang Cá nhân")
+    else:
+        user = users_df[
+            users_df["Tên người dùng"] == st.session_state.logged_in_user
+        ].iloc[0]
+
+        st.subheader("🎞️ 5 phim bạn xem gần nhất")
+
+        try:
+            recent_movies = ast.literal_eval(user["5 phim coi gần nhất"])
+        except:
+            recent_movies = []
+
+        recent_df = movies_df[movies_df["Tên phim"].isin(recent_movies)]
+        show_movies(recent_df)
+
+        st.subheader("📊 Xu hướng xem phim")
+        plot_user_trend_from_movies(recent_movies)
+
+# ================== USER MỚI ==================
+elif st.session_state.is_new_user:
+    st.subheader("🎯 Chọn thể loại & Đề xuất")
     st.session_state.user_genres = st.multiselect(
         "Thể loại muốn xem:",
         ALL_GENRES,
         default=st.session_state.user_genres
     )
+
     if st.button("🎬 Đề xuất phim"):
         st.session_state.last_results = recommend_by_genres(
             st.session_state.user_genres
         )
 
-# CONTENT BASED
+# ================== CONTENT BASED ==================
 elif menu == "Đề xuất theo Tên Phim":
     movie = st.selectbox("Chọn phim:", movies_df["Tên phim"])
     if st.button("Tìm"):
         st.session_state.last_results = content_based(movie)
 
-# AI + REFRESH
+# ================== AI + REFRESH ==================
 elif menu == "Đề xuất theo AI":
     if st.button("🎬 Đề xuất AI"):
         if st.session_state.logged_in_user == "GUEST":
@@ -260,7 +293,7 @@ elif menu == "Đề xuất theo AI":
             user = users_df[users_df["Tên người dùng"] == st.session_state.logged_in_user].iloc[0]
             st.session_state.last_results = profile_based(user)
 
-# FAVORITE GENRE
+# ================== GENRE FAVORITE ==================
 elif menu == "Đề xuất theo Thể loại Yêu thích":
     if st.session_state.logged_in_user == "GUEST":
         st.session_state.last_results = recommend_by_genres(
@@ -276,19 +309,12 @@ elif menu == "Đề xuất theo Thể loại Yêu thích":
         if fav in movies_df["Tên phim"].values:
             g = movies_df[movies_df["Tên phim"] == fav]["Thể loại phim"].values[0].split(",")
             st.session_state.last_results = recommend_by_genres(g)
-
-        if st.button("🔄 Tạo đề xuất mới"):
-            st.session_state.last_results = recommend_by_genres(g)
+            if st.button("🔄 Tạo đề xuất mới"):
+                st.session_state.last_results = recommend_by_genres(g)
 
 # ======================================================
-# SHOW + CHART
+# SHOW RESULTS
 # ======================================================
-if st.session_state.last_results is not None:
+if st.session_state.last_results is not None and menu != "Cá nhân":
     st.markdown("---")
     show_movies(st.session_state.last_results)
-
-    if st.checkbox("📊 Hiển thị Biểu đồ"):
-        plot_recommendation_bar(
-            st.session_state.last_results,
-            title="So sánh Đề xuất Phim"
-        )
