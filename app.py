@@ -392,3 +392,4 @@ elif st.session_state.user_mode in ['guest', 'register']:
                     st.caption(row['Tên phim'])
 
 
+
