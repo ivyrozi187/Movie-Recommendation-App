@@ -22,7 +22,7 @@ st.set_page_config(
 @st.cache_resource
 def load_data():
     movie_path = "data_phim_full_images.csv"
-    user_path = "danh_sach_nguoi_dung_moi.csv"
+    user_path = "danh_sach_nguoi_dung_gia_lap.csv"
 
     if not os.path.exists(movie_path):
         st.error(f"❌ Không tìm thấy file {movie_path}")
@@ -156,4 +156,5 @@ else:
     if st.button("Đăng xuất"):
         st.session_state.clear()
         st.rerun()
+
 
