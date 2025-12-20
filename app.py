@@ -1,142 +1,252 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import ast
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
+from collections import Counter
 
 # ==============================================================================
 # 1. CONFIG
 # ==============================================================================
 st.set_page_config(
-    page_title="Movie Recommendation AI",
+    page_title="Movie RecSys AI",
     page_icon="🎬",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.title("🎬 Movie Recommendation AI")
-
 # ==============================================================================
-# 2. LOAD & PREPROCESS DATA
+# 2. LOAD DATA
 # ==============================================================================
 @st.cache_resource
-def load_data():
+def load_and_process_data():
     movies = pd.read_csv("data_phim_full_images.csv")
+    users = pd.read_csv("danh_sach_nguoi_dung_moi.csv")
 
-    # Fill missing
-    movies['Đạo diễn'] = movies['Đạo diễn'].fillna('')
-    movies['Thể loại phim'] = movies['Thể loại phim'].fillna('')
-    movies['Tên phim'] = movies['Tên phim'].fillna('')
+    movies.fillna('', inplace=True)
 
-    # Combined features
     movies['combined_features'] = (
         movies['Tên phim'] + " " +
         movies['Đạo diễn'] + " " +
         movies['Thể loại phim']
     )
 
-    # Popularity scaling
     scaler = MinMaxScaler()
     movies['popularity_scaled'] = scaler.fit_transform(movies[['Độ phổ biến']])
 
-    # TF-IDF + Cosine
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(movies['combined_features'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
-    return movies, cosine_sim
+    users['history_list'] = users['5 phim coi gần nhất'].apply(
+        lambda x: ast.literal_eval(x) if isinstance(x, str) else []
+    )
 
-movies_df, cosine_sim = load_data()
+    all_genres = sorted(
+        {g.strip() for row in movies['Thể loại phim'] for g in row.split(',')}
+    )
+
+    return movies, users, cosine_sim, all_genres
+
+movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 
 # ==============================================================================
 # 3. SESSION STATE
 # ==============================================================================
-if 'ai_seen_indices' not in st.session_state:
-    st.session_state.ai_seen_indices = set()
+if 'user_mode' not in st.session_state:
+    st.session_state.user_mode = None
+if 'current_user' not in st.session_state:
+    st.session_state.current_user = None
+if 'user_genres' not in st.session_state:
+    st.session_state.user_genres = []
+
+for k in ['ai_seen', 'search_seen', 'genre_seen']:
+    if k not in st.session_state:
+        st.session_state[k] = set()
 
 # ==============================================================================
-# 4. AI RECOMMENDATION FUNCTION (HOÀN CHỈNH)
+# 4. RECOMMENDATION FUNCTIONS
 # ==============================================================================
-def get_ai_recommendations(
-    history_titles,
-    top_k=10,
-    w_sim=0.7,
-    w_pop=0.3,
-    exclude_indices=None
-):
-    if exclude_indices is None:
-        exclude_indices = set()
+def get_ai_recommendations(history_titles, top_k=10, w_sim=0.7, w_pop=0.3, exclude=None):
+    if exclude is None:
+        exclude = set()
 
-    # Lấy index phim đã xem
-    watched_indices = []
-    for title in history_titles:
-        idx = movies_df[movies_df['Tên phim'] == title].index
+    indices = []
+    for t in history_titles:
+        idx = movies_df[movies_df['Tên phim'] == t].index
         if not idx.empty:
-            watched_indices.append(idx[0])
+            indices.append(idx[0])
 
-    # Nếu chưa có lịch sử → đề xuất theo độ phổ biến
-    if not watched_indices:
-        df = movies_df[~movies_df.index.isin(exclude_indices)]
-        result = df.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
-        return result, list(result.index)
+    if not indices:
+        df = movies_df[~movies_df.index.isin(exclude)]
+        res = df.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
+        return res, list(res.index)
 
-    # Similarity score
-    sim_scores = np.mean(cosine_sim[watched_indices], axis=0)
-    pop_scores = movies_df['popularity_scaled'].values
+    sim_scores = np.mean(cosine_sim[indices], axis=0)
+    final_scores = w_sim * sim_scores + w_pop * movies_df['popularity_scaled'].values
 
-    # Hybrid score
-    final_scores = (w_sim * sim_scores) + (w_pop * pop_scores)
+    ranked = sorted(enumerate(final_scores), key=lambda x: x[1], reverse=True)
+    rec_idx = [i for i, _ in ranked if i not in indices and i not in exclude][:top_k]
 
-    ranked = sorted(
-        enumerate(final_scores),
-        key=lambda x: x[1],
-        reverse=True
-    )
+    return movies_df.iloc[rec_idx], rec_idx
 
-    # Loại phim đã xem + đã đề xuất
-    rec_indices = [
-        i for i, _ in ranked
-        if i not in watched_indices and i not in exclude_indices
-    ][:top_k]
 
-    return movies_df.iloc[rec_indices], rec_indices
+def get_genre_recommendations(genres, top_k=10, exclude=None):
+    if exclude is None:
+        exclude = set()
+    if not genres:
+        return pd.DataFrame(), []
+
+    pattern = "|".join(genres)
+    df = movies_df[movies_df['Thể loại phim'].str.contains(pattern, case=False)]
+    df = df[~df.index.isin(exclude)]
+
+    res = df.sort_values(by='Độ phổ biến', ascending=False).head(top_k)
+    return res, list(res.index)
+
+
+def search_movie_func(query):
+    return movies_df[movies_df['Tên phim'].str.contains(query, case=False)]
+
+
+def draw_user_charts(history):
+    genres = []
+    for t in history:
+        r = movies_df[movies_df['Tên phim'] == t]
+        if not r.empty:
+            genres += [g.strip() for g in r.iloc[0]['Thể loại phim'].split(',')]
+
+    if not genres:
+        st.warning("Chưa có dữ liệu")
+        return
+
+    df = pd.Series(genres).value_counts().reset_index()
+    df.columns = ['Thể loại', 'Số phim']
+
+    fig, ax = plt.subplots()
+    sns.barplot(data=df, x='Số phim', y='Thể loại', ax=ax)
+    st.pyplot(fig)
 
 # ==============================================================================
-# 5. UI
+# 5. SIDEBAR
 # ==============================================================================
+with st.sidebar:
+    st.title("🎬 DreamStream")
 
-st.subheader("📌 Nhập lịch sử phim đã xem (để test AI)")
-history_titles = st.multiselect(
-    "Chọn vài phim bạn đã xem:",
-    movies_df['Tên phim'].tolist()
-)
+    if st.session_state.user_mode == 'member':
+        menu = st.radio("Chức năng", [
+            "Đề xuất AI",
+            "Tìm kiếm Phim",
+            "Theo Thể loại Yêu thích",
+            "Thống kê Cá nhân"
+        ])
+        if st.button("Đăng xuất"):
+            st.session_state.user_mode = None
+            st.session_state.current_user = None
+            for k in ['ai_seen', 'search_seen', 'genre_seen']:
+                st.session_state[k].clear()
+            st.rerun()
 
-col1, col2 = st.columns([1, 3])
-
-with col1:
-    if st.button("🔄 Tạo đề xuất mới"):
-        st.session_state.ai_seen_indices.clear()
-
-with col2:
-    st.write("Mỗi lần bấm sẽ tạo **10 phim khác – không trùng phim cũ**")
-
-st.divider()
+    elif st.session_state.user_mode == 'guest':
+        menu = st.radio("Chức năng", ["Đề xuất AI (Cơ bản)", "Theo Thể loại Đã chọn"])
+        if st.button("Thoát"):
+            st.session_state.user_mode = None
+            st.session_state.user_genres = []
+            st.rerun()
+    else:
+        menu = "Login"
 
 # ==============================================================================
-# 6. SHOW RECOMMENDATIONS
+# 6. LOGIN / REGISTER / GUEST
 # ==============================================================================
-recs, new_indices = get_ai_recommendations(
-    history_titles,
-    exclude_indices=st.session_state.ai_seen_indices
-)
+if st.session_state.user_mode is None:
+    tab1, tab2, tab3 = st.tabs(["Đăng nhập", "Đăng ký", "Khách"])
 
-st.session_state.ai_seen_indices.update(new_indices)
+    with tab1:
+        u = st.text_input("Tên đăng nhập")
+        if st.button("Đăng nhập"):
+            r = users_df[users_df['Tên người dùng'] == u]
+            if not r.empty:
+                st.session_state.user_mode = 'member'
+                st.session_state.current_user = r.iloc[0]
+                st.rerun()
 
-if recs.empty:
-    st.warning("Không còn phim để đề xuất.")
-else:
-    cols = st.columns(5)
-    for i, (_, row) in enumerate(recs.iterrows()):
-        with cols[i % 5]:
-            st.image(row['Link Poster'], use_container_width=True)
-            st.caption(row['Tên phim'])
+    with tab2:
+        u = st.text_input("Tên mới")
+        g = st.multiselect("Thể loại yêu thích", ALL_GENRES)
+        if st.button("Đăng ký & Vào ngay"):
+            st.session_state.user_mode = 'member'
+            st.session_state.current_user = {
+                'Tên người dùng': u,
+                'history_list': [],
+                'Phim yêu thích nhất': ''
+            }
+            st.session_state.user_genres = g
+            st.rerun()
+
+    with tab3:
+        g = st.multiselect("Chọn thể loại", ALL_GENRES)
+        if st.button("Vào ngay"):
+            st.session_state.user_mode = 'guest'
+            st.session_state.user_genres = g
+            st.rerun()
+
+# ==============================================================================
+# 7. MEMBER FEATURES
+# ==============================================================================
+elif st.session_state.user_mode == 'member':
+    history = st.session_state.current_user['history_list']
+
+    if menu == "Đề xuất AI":
+        if st.button("🔄 Tạo mới"):
+            st.session_state.ai_seen.clear()
+
+        recs, idxs = get_ai_recommendations(history, exclude=st.session_state.ai_seen)
+        st.session_state.ai_seen.update(idxs)
+
+    elif menu == "Tìm kiếm Phim":
+        q = st.text_input("Tên phim")
+        if q:
+            r = search_movie_func(q)
+            if not r.empty:
+                if st.button("🔄 Phim tương tự khác"):
+                    st.session_state.search_seen.clear()
+
+                recs, idxs = get_ai_recommendations(
+                    [r.iloc[0]['Tên phim']],
+                    w_sim=1, w_pop=0,
+                    exclude=st.session_state.search_seen
+                )
+                st.session_state.search_seen.update(idxs)
+
+    elif menu == "Theo Thể loại Yêu thích":
+        fav = st.session_state.current_user['Phim yêu thích nhất']
+        row = movies_df[movies_df['Tên phim'] == fav]
+        if not row.empty:
+            genres = [g.strip() for g in row.iloc[0]['Thể loại phim'].split(',')]
+            if st.button("🔄 Tạo mới"):
+                st.session_state.genre_seen.clear()
+
+            recs, idxs = get_genre_recommendations(genres, exclude=st.session_state.genre_seen)
+            st.session_state.genre_seen.update(idxs)
+
+    elif menu == "Thống kê Cá nhân":
+        draw_user_charts(history)
+
+# ==============================================================================
+# 8. GUEST FEATURES
+# ==============================================================================
+elif st.session_state.user_mode == 'guest':
+    if menu == "Đề xuất AI (Cơ bản)":
+        if st.button("🔄 Tạo mới"):
+            st.session_state.genre_seen.clear()
+        recs, idxs = get_genre_recommendations(st.session_state.user_genres, exclude=st.session_state.genre_seen)
+        st.session_state.genre_seen.update(idxs)
+
+    elif menu == "Theo Thể loại Đã chọn":
+        g = st.selectbox("Chọn thể loại", st.session_state.user_genres)
+        recs, _ = get_genre_recommendations([g])
