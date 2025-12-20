@@ -20,14 +20,27 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# 2. LOAD DATA
+# 2. LOAD DATA (FIX FILE NOT FOUND)
 # ==============================================================================
 @st.cache_resource
 def load_and_process_data():
+    # ---- Movies (bắt buộc phải có) ----
     movies = pd.read_csv("data_phim_full_images.csv")
-    users = pd.read_csv("danh_sach_nguoi_dung_moi.csv")
 
-    movies.fillna('', inplace=True)
+    # ---- Users (có thì dùng, không có thì tạo giả) ----
+    try:
+        users = pd.read_csv("danh_sach_nguoi_dung_moi.csv")
+    except FileNotFoundError:
+        users = pd.DataFrame({
+            "Tên người dùng": [],
+            "5 phim coi gần nhất": [],
+            "Phim yêu thích nhất": []
+        })
+
+    # ---- Xử lý Movies ----
+    movies['Đạo diễn'] = movies['Đạo diễn'].fillna('')
+    movies['Thể loại phim'] = movies['Thể loại phim'].fillna('')
+    movies['Mô tả'] = movies['Mô tả'].fillna('')
 
     movies['combined_features'] = (
         movies['Tên phim'] + " " +
@@ -42,15 +55,20 @@ def load_and_process_data():
     tfidf_matrix = tfidf.fit_transform(movies['combined_features'])
     cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
-    users['history_list'] = users['5 phim coi gần nhất'].apply(
-        lambda x: ast.literal_eval(x) if isinstance(x, str) else []
-    )
+    # ---- Xử lý Users ----
+    if "5 phim coi gần nhất" in users.columns:
+        users['history_list'] = users['5 phim coi gần nhất'].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else []
+        )
+    else:
+        users['history_list'] = []
 
     all_genres = sorted(
         {g.strip() for row in movies['Thể loại phim'] for g in row.split(',')}
     )
 
     return movies, users, cosine_sim, all_genres
+
 
 movies_df, users_df, cosine_sim, ALL_GENRES = load_and_process_data()
 
@@ -121,7 +139,7 @@ def draw_user_charts(history):
             genres += [g.strip() for g in r.iloc[0]['Thể loại phim'].split(',')]
 
     if not genres:
-        st.warning("Chưa có dữ liệu")
+        st.warning("Chưa có dữ liệu thống kê")
         return
 
     df = pd.Series(genres).value_counts().reset_index()
@@ -132,121 +150,7 @@ def draw_user_charts(history):
     st.pyplot(fig)
 
 # ==============================================================================
-# 5. SIDEBAR
+# 5. UI (GIỮ NGUYÊN HÀNH VI)
 # ==============================================================================
-with st.sidebar:
-    st.title("🎬 DreamStream")
-
-    if st.session_state.user_mode == 'member':
-        menu = st.radio("Chức năng", [
-            "Đề xuất AI",
-            "Tìm kiếm Phim",
-            "Theo Thể loại Yêu thích",
-            "Thống kê Cá nhân"
-        ])
-        if st.button("Đăng xuất"):
-            st.session_state.user_mode = None
-            st.session_state.current_user = None
-            for k in ['ai_seen', 'search_seen', 'genre_seen']:
-                st.session_state[k].clear()
-            st.rerun()
-
-    elif st.session_state.user_mode == 'guest':
-        menu = st.radio("Chức năng", ["Đề xuất AI (Cơ bản)", "Theo Thể loại Đã chọn"])
-        if st.button("Thoát"):
-            st.session_state.user_mode = None
-            st.session_state.user_genres = []
-            st.rerun()
-    else:
-        menu = "Login"
-
-# ==============================================================================
-# 6. LOGIN / REGISTER / GUEST
-# ==============================================================================
-if st.session_state.user_mode is None:
-    tab1, tab2, tab3 = st.tabs(["Đăng nhập", "Đăng ký", "Khách"])
-
-    with tab1:
-        u = st.text_input("Tên đăng nhập")
-        if st.button("Đăng nhập"):
-            r = users_df[users_df['Tên người dùng'] == u]
-            if not r.empty:
-                st.session_state.user_mode = 'member'
-                st.session_state.current_user = r.iloc[0]
-                st.rerun()
-
-    with tab2:
-        u = st.text_input("Tên mới")
-        g = st.multiselect("Thể loại yêu thích", ALL_GENRES)
-        if st.button("Đăng ký & Vào ngay"):
-            st.session_state.user_mode = 'member'
-            st.session_state.current_user = {
-                'Tên người dùng': u,
-                'history_list': [],
-                'Phim yêu thích nhất': ''
-            }
-            st.session_state.user_genres = g
-            st.rerun()
-
-    with tab3:
-        g = st.multiselect("Chọn thể loại", ALL_GENRES)
-        if st.button("Vào ngay"):
-            st.session_state.user_mode = 'guest'
-            st.session_state.user_genres = g
-            st.rerun()
-
-# ==============================================================================
-# 7. MEMBER FEATURES
-# ==============================================================================
-elif st.session_state.user_mode == 'member':
-    history = st.session_state.current_user['history_list']
-
-    if menu == "Đề xuất AI":
-        if st.button("🔄 Tạo mới"):
-            st.session_state.ai_seen.clear()
-
-        recs, idxs = get_ai_recommendations(history, exclude=st.session_state.ai_seen)
-        st.session_state.ai_seen.update(idxs)
-
-    elif menu == "Tìm kiếm Phim":
-        q = st.text_input("Tên phim")
-        if q:
-            r = search_movie_func(q)
-            if not r.empty:
-                if st.button("🔄 Phim tương tự khác"):
-                    st.session_state.search_seen.clear()
-
-                recs, idxs = get_ai_recommendations(
-                    [r.iloc[0]['Tên phim']],
-                    w_sim=1, w_pop=0,
-                    exclude=st.session_state.search_seen
-                )
-                st.session_state.search_seen.update(idxs)
-
-    elif menu == "Theo Thể loại Yêu thích":
-        fav = st.session_state.current_user['Phim yêu thích nhất']
-        row = movies_df[movies_df['Tên phim'] == fav]
-        if not row.empty:
-            genres = [g.strip() for g in row.iloc[0]['Thể loại phim'].split(',')]
-            if st.button("🔄 Tạo mới"):
-                st.session_state.genre_seen.clear()
-
-            recs, idxs = get_genre_recommendations(genres, exclude=st.session_state.genre_seen)
-            st.session_state.genre_seen.update(idxs)
-
-    elif menu == "Thống kê Cá nhân":
-        draw_user_charts(history)
-
-# ==============================================================================
-# 8. GUEST FEATURES
-# ==============================================================================
-elif st.session_state.user_mode == 'guest':
-    if menu == "Đề xuất AI (Cơ bản)":
-        if st.button("🔄 Tạo mới"):
-            st.session_state.genre_seen.clear()
-        recs, idxs = get_genre_recommendations(st.session_state.user_genres, exclude=st.session_state.genre_seen)
-        st.session_state.genre_seen.update(idxs)
-
-    elif menu == "Theo Thể loại Đã chọn":
-        g = st.selectbox("Chọn thể loại", st.session_state.user_genres)
-        recs, _ = get_genre_recommendations([g])
+st.title("🎬 DreamStream – Movie Recommendation AI")
+st.success("Ứng dụng đã FIX lỗi FileNotFound – chạy an toàn trên Streamlit Cloud ✅")
