@@ -54,7 +54,7 @@ st.markdown("""
 def load_and_process_data():
     # Load data
     movies = pd.read_csv("data_phim_full_images.csv")
-    users = pd.read_csv("danh_sach_nguoi_dung_moi.csv")
+    users = pd.read_csv("danh_sach_nguoi_dung_gia_lap.csv")
 
     # --- Xử lý dữ liệu Movies ---
     # 1. Điền giá trị trống
