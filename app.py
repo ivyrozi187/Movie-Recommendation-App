@@ -41,7 +41,7 @@ st.markdown("""
 @st.cache_resource
 def load_and_process_data():
     movies = pd.read_csv("data_phim_full_images.csv")
-    users = pd.read_csv("danh_sach_nguoi_dung_moi.csv")
+    users = pd.read_csv("danh_sach_nguoi_dung_gia_lap.csv")
 
     movies['Đạo diễn'] = movies['Đạo diễn'].fillna('')
     movies['Thể loại phim'] = movies['Thể loại phim'].fillna('')
@@ -482,4 +482,5 @@ elif st.session_state.user_mode in ['guest', 'register']:
             with cols[i % 5]:
                 st.image(row['Link Poster'], use_container_width=True)
                 st.caption(row['Tên phim'])
+
 
